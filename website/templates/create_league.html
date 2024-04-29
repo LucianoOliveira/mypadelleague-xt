@@ -1,0 +1,80 @@
+{% extends "base.html" %} {% block title %}Rio Padel League{% endblock %} {% block content %}
+<div class="clearfix"></div>
+	
+<div class="container-fluid">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="card-title">Criar Nova Liga</div>
+                <hr>
+                    <form action="{{ url_for('views.insertLeague') }}" method="post" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="input-6">Nome</label>
+                        <input type="text" class="form-control form-control-rounded" id="input-6" placeholder="Nome da Liga" name="league_name">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-7">Nivel</label>
+                        <select  class="form-control form-control-rounded" id="input-7" name="league_level">
+                            <option class="form-control" value="M4M5" name="league_level" selected >M4M5</option>
+                            <option class="form-control" value="M3M4" name="league_level">M3M4</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-8">Estado</label>
+                        <select  class="form-control form-control-rounded" id="input-8" name="league_status">
+                            <option class="form-control" value="1 - Ativo" name="league_status" selected>Ativo</option>
+                            <option class="form-control" value="0 - Inativo" name="league_status">Inativo</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-9">Número Jornadas</label>
+                        <input type="number" class="form-control form-control-rounded" id="input-9" placeholder="Jornadas Liga" name="league_numGameDays">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-10">Número equipas</label>
+                        <input type="number" class="form-control form-control-rounded" id="input-10" placeholder="Número equipas por jornada" name="league_teams">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-11">Data Inicio Liga</label>
+                        <input type="date" class="form-control form-control-rounded" id="input-11" placeholder="Calendario escolher data inicio" name="league_dateStart">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-12">Data Fim Liga</label>
+                        <input type="date" class="form-control form-control-rounded" id="input-12" placeholder="Calendario escolher data fim" name="league_dateEnd">
+                    </div>
+                    <div class="form-group">
+                        <label for="timeStart">Hora Inicio</label>
+                        <input type="time" class="form-control form-control-rounded" id="timeStart" placeholder="Hora Inicio" name="timeStart">
+                    </div>
+                    <div class="form-group">
+                        <label for="league_billboard">Cartaz Grande</label>
+                        <input type="file" class="form-control form-control-rounded" id="league_billboard" placeholder="Cartaz da liga" name="league_billboard">
+                    </div>
+                    <div class="form-group">
+                        <label for="league_billboard_S">Cartaz Pequeno</label>
+                        <input type="file" class="form-control form-control-rounded" id="league_billboard_S" placeholder="Cartaz da liga pequeno" name="league_billboard_S">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-14">Tipo de Liga</label>
+                        <select class="form-control form-control-rounded" id="league_type" name="league_type">
+                            <option value="Liga">Liga</option>
+                            <option value="Avulso">NonStop sem Liga</option>
+                            <option value="Outro">Outro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-light btn-round px-5"><i class="icon-save"></i> Criar Liga</button>
+                    </div>
+                    </form>
+            </div>
+        </div>
+    </div>
+    <!--start overlay-->
+    <div class="overlay toggle-menu"></div>
+    <!--end overlay-->
+
+</div>
+<!-- End container-fluid-->
+    
+
+{% endblock %}

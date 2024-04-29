@@ -1,0 +1,69 @@
+{% extends "base.html" %} {% block title %}XT Padel League{% endblock %} 
+{% block content %}
+<!-- WPT -->
+<link href="../static/css/app-min.css" rel="stylesheet"/>
+
+<!-- Tabela das ligas -->
+<div class="row">
+  <div class="col-lg-12">
+      <div class="card">
+          <div class="card-body">
+              <h5 class="card-title">Ligas</h5>
+              <div class="table-responsive">
+                  <table class="table table-hover">
+                      <thead>
+                          <tr>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {% for data in result %}
+                              <div class="l-grid l-grid--flex l-grid--flex-centered">
+                                  <div class="c-tournaments c-tournaments--new c-tournaments--fixed">
+                                      <div class="c-tournaments__top-block">
+                                          <div class="c-tournaments__top-block__title">
+                                              <span class="c-tournaments__line"></span>
+                                              <h5>{{ data['lg_status'][4:] }}</h5>
+                                          </div>
+                                      </div>
+                                      <div class="c-tournaments__container">
+                                          <div class="c-tournaments__poster">
+                                              {% set bigPhoto = "static/photos/leagues/" + data['lg_id']|string + ".jpg"  %}
+
+                                              {% set smallPhoto = "static/photos/leagues/" + data['lg_id']|string + "s.jpg"  %}
+
+                                              <a target="_blank" href="{{ bigPhoto }}" class="c-trigger">
+                                                  <img src="{{ bigPhoto }}">
+                                              </a>
+                                              <div class="c-tournaments__img c-tournaments__img--bg" style="background-image: url({{ bigPhoto }});"></div>
+                                          </div>
+                                          <div class="c-tournaments__content">
+                                              <header class="c-tournaments__top-card">
+                                                  <div class="c-tournaments__header" style="background:url('{{ smallPhoto }}');"></div>
+                                                  <p class="c-tournaments__date">De {{ data['lg_startDate'] }} a {{ data['lg_endDate'] }}</p>
+                                              </header>
+                                              <footer class="c-tournaments__bottom-card">
+                                                  <div class="c-tournaments__header">
+                                                      <h3 class="c-tournaments__title">{{ data['lg_name'] }}</h3>
+                                                      <p class="c-tournaments__cat">Categoria: {{ data['lg_level'] }}</p>
+                                                  </div>
+                                              </footer>
+                                              <div class="c-tournaments__triggers">
+                                                  <a class="c-btn c-btn--secondary" href="{{ url_for('views.league_detail', leagueID=data['lg_id']) }}">+ DETALHE</a>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+
+                          {% endfor %}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+      </div>
+  </div>
+</div><!-- End Row -->
+
+
+
+{% endblock %}

@@ -1,0 +1,450 @@
+{% extends "base.html" %} {% block title %}XT Padel League{% endblock %} 
+{% block content %}
+<!-- WPT -->
+<link href="../static/css/swiper-bundle.min.css" rel="stylesheet"/>
+<!-- Show front page of gameday -->
+<!-- Show every detail of a player -->
+
+<!-- basic user data -->
+<div class="container-fluid">
+  <div class="col-lg-12">
+      <div class="card">
+          <div class="card-body">
+              <div class="card-title">Editar Jogador</div>
+              <hr>
+              <form action="{{ url_for('views.insertPlayer') }}" method="post" enctype="multipart/form-data">
+                  <div class="form-group">
+                      <label for="player_name">Nome</label>
+                      <input type="text" class="form-control form-control-rounded" id="player_name" placeholder="{{ player.player_name }}" name="player_name" value="{{ player.player_name }}">
+                  </div>
+                  <div class="form-group">
+                      <label for="player_email">Email</label>
+                      <input type="text" class="form-control form-control-rounded" id="player_email" placeholder="{{ player.player_email }}" name="player_email" value="{{ player.player_email }}">
+                  </div>
+                  <div class="form-group">
+                      <label for="player_dob">Data de Nascimento</label>
+                      <input type="date" class="form-control form-control-rounded" id="player_dob" placeholder="Calendario escolher data de nascimento" name="player_dob" value="{{ player.player_birthday }}">
+                  </div>
+                  <div class="form-group">
+                    <label for="player_category">Categoria</label>
+                    <select class="form-control form-control-rounded" id="player_category" name="player_category">
+                        <option value="800" {% if player.player_category|string == "800" %} selected {% endif %}>M/F 5</option>
+                        <option value="1000" {% if player.player_category|string == "1000" %} selected {% endif %}>M/F 4</option>
+                        <option value="1200" {% if player.player_category|string == "1200" %} selected {% endif %}>M/F 3</option>
+                    </select>
+                  </div>
+                
+                  <div class="form-group">
+                      <label for="player_photo">Fotografia</label>
+                      <input type="file" class="form-control form-control-rounded" id="player_photo" placeholder="Fotografia" name="player_photo">
+                  </div>
+                  <div class="form-group">
+                      <button type="submit" class="btn btn-light btn-round px-5"><i class="icon-save"></i> Editar Jogador</button>
+                  </div>
+                  <!-- Delete button -->
+                  <div class="form-group">
+                    <a href="{{ url_for('views.delete_player', playerID=player.player_id) }}" class="btn btn-danger btn-round" onclick="return confirm('Tem a certeza que deseja apagar este jogador?')">
+                        <i class="icon-trash"></i> Apagar Jogador
+                    </a>
+                </div>
+              </form>
+          </div>
+      </div>
+  </div>
+  <!-- end row -->
+
+<!-- Show every detail of a player Row -->
+<div class="row gutters-sm">
+    <div class="col-md-4 mb-3">
+        <!-- General data -->
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex flex-column align-items-center text-center">
+                    <img src="{{ url_for('views.display_user_image', userID=player.player_id ) }}" alt="{{ player.player_name }}" class="rounded-circle" width="150">
+                    <div class="mt-3">
+                        <h4>{{ player.player_name }}</h4>
+                        <p class="mb-1">{{ player.numGameDayWins }}</p>
+                        <p class="mb-2">{{ "Último jogo: " + player.lastGamePlayed }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <!-- Full data -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-sm-3">
+                        <h6 class="mb-0">Nome</h6>
+                    </div>
+                    <div class="col-sm-9">
+                        {{ player.player_name }}
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <h6 class="mb-0">Email</h6>
+                    </div>
+                    <div class="col-sm-9">
+                        {{ player.player_email }}
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <h6 class="mb-0">Data Nascimento</h6>
+                    </div>
+                    <div class="col-sm-9">
+                        {{ player.player_birthday }}
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <h6 class="mb-0">Idade</h6>
+                    </div>
+                    <div class="col-sm-9">
+                        {{ calculate_age(player.player_birthday) }} Anos
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <h6 class="mb-0">Jogos Ganhos / Total</h6>
+                    </div>
+                    <div class="col-sm-9">
+                        {{ player.games_won }} / {{ player.total_games }}
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <h6 class="mb-0">Melhor parceiro</h6>
+                    </div>
+                    <div class="col-sm-9">
+                        {{ player.best_teammate_name }} - {{ player.best_teammate_win_percentage }}% Vitórias em {{ player.best_teammate_total_games }} Jogos.
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <h6 class="mb-0">Pior parceiro</h6>
+                    </div>
+                    <div class="col-sm-9">
+                        {{ player.worst_teammate_name }} - {{ player.worst_teammate_lost_percentage }}% Derrotas em {{ player.worst_teammate_total_games }} Jogos.
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <h6 class="mb-0">Pior adversário</h6>
+                    </div>
+                    <div class="col-sm-9">
+                        {{ player.worst_nightmare_name }} - {{ player.worst_nightmare_lost_percentage }}% Derrotas em {{ player.worst_nightmare_games }} Jogos.
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <h6 class="mb-0">Melhor adversário</h6>
+                    </div>
+                    <div class="col-sm-9">
+                        {{ player.best_opponent_name }} - {{ player.best_opponent_victory_percentage }}% Vitórias em {{ player.best_opponent_games }} Jogos.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div><!--END ROW -->
+
+<!-- DONE - Add the graph for ELO -->
+<!-- ROW ELO CHART -->
+<div class="row">
+  <div class="col-12 d-none d-sm-block">
+      <div class="card">
+          <div class="card-header">Evolução Ranking ELO
+              <div class="card-action">
+              </div>
+          </div>
+          <div class="card-body">
+              <ul class="list-inline">
+                  <li class="list-inline-item"><i class="fa fa-circle mr-2 text-white"></i>Ranking</li>
+              </ul>
+              <div class="chart-container-1">
+                  <canvas id="ELO_Chart"></canvas>
+              </div>
+          </div>
+          <div class="row m-0 row-group text-center border-top border-light-3">
+              <div class="col-12 col-lg-4">
+                  <div class="p-3">
+                      
+                      <h5 class="mb-0">{{ rankingELO_bestWorst[0]|default(0)|round(2) }}</h5>
+                      <small class="mb-0">Valor mais alto <span> <i class="fa fa-arrow-down"></i> {{ '%.2f' % (((rankingELO_bestWorst[0] / rankingELO_bestWorst[2])-1) * 100) }}%</span></small>
+                  </div>
+              </div>
+              <div class="col-12 col-lg-4">
+                  <div class="p-3">
+                      <h5 class="mb-0">{{ rankingELO_bestWorst[1]|round(2) }}</h5>
+                      <small class="mb-0">Valor mais baixo <span> <i class="fa fa-arrow-up"></i> {{ '%.2f' % (((rankingELO_bestWorst[2]/rankingELO_bestWorst[1])-1)*100) }}%</span></small>
+                  </div>
+              </div>
+              <div class="col-12 col-lg-4">
+                  <div class="p-3">
+                      <h5 class="mb-0">{{ (rankingELO_bestWorst[0]-rankingELO_bestWorst[1])|round(2) }}</h5>
+                      <small class="mb-0">Variancia <span> <i class="fa fa-arrows-v"></i> {{ '%.2f' % (((rankingELO_bestWorst[0]/rankingELO_bestWorst[1])-1)*100) }}%</span></small>
+                  </div>
+              </div>
+          </div>
+      </div>
+  </div>
+</div><!-- End Row -->
+
+<!-- ROW ELO CHART -->
+<div class="row">
+  <div class="col-12 d-block d-sm-none">
+      <div class="card">
+          <div class="card-header">Evolução Ranking ELO
+              <div class="card-action">
+              </div>
+          </div>
+          <div class="card-body">
+              <ul class="list-inline">
+                  <li class="list-inline-item"><i class="fa fa-circle mr-2 text-white"></i>Ranking</li>
+              </ul>
+              <div class="chart-container-1">
+                  <canvas id="ELO_ChartShort"></canvas>
+              </div>
+          </div>
+          <div class="row m-0 row-group text-center border-top border-light-3">
+          </div>
+      </div>
+  </div>
+</div><!-- End Row -->
+
+
+
+<!-- Games WPT Style row -->
+<!-- Games Row -->
+<div class="row">
+    {% for data in results %}
+      <div class="col-lg-4">
+        <div class="card" style="min-width: 320px">
+          <div class="card-header">
+            {% if ((data.gm_idPlayer_A1|string == player_id|string or data.gm_idPlayer_A2|string == player_id|string) and (data.gm_result_A > data.gm_result_B)) or
+                ((data.gm_idPlayer_B1|string == player_id|string or data.gm_idPlayer_B2|string == player_id|string) and (data.gm_result_B > data.gm_result_A)) %}
+              <h5 class="card-title" style="color:green;">Vitória</h5>
+            {% else %}
+              <h5 class="card-title" style="color:red;">Derrota</h5>
+            {% endif %}
+          </div>
+          <div class="card-body">
+            <div class="swiper-slide" data-swiper-slide-index="1" style="width: 100%; left: 0px; margin-right: 1px;" role="group" aria-label="3 / 28">
+              <div id="partido1B" class="slideoculto">
+                <div style="width: 100%;height: 140px;"> 
+                  <a href="https://www.worldpadeltour.com/marcador" target="_parent">
+                    <img src="swipper/score1.png" style="width:50%;margin-top:5%;float:left;">
+                  </a> 
+                  <a href="https://www.worldpadeltour.com/stats/54484" target="_parent">
+                    <img src="swipper/stats.png" style="width:50%;margin-top:5%;float:left;">
+                  </a>
+                </div>
+              </div>
+              <div id="partido1A" style="width: 100%;height: 192px;padding: 10px;">
+                <div class="fase">{{ data.gm_date }}</div>
+                <div class="fecha">{{ data.gm_timeStart }} - {{ data.gm_court }}</div>
+                {% if data.gm_idPlayer_A1 != '' %}
+                  {% set playerId = data.gm_idPlayer_A1 %}
+                  {% set photoA1 = "../static/photos/users/" + data.gm_idPlayer_A1|string + "/main.jpg"  %}
+  
+                  {% set playerId = data.gm_idPlayer_A2 %}
+                  {% set photoA2 = "../static/photos/users/" + data.gm_idPlayer_A2|string + "/main.jpg" %}
+                {% else %}
+                  {% set photoA1 = "../static/photos/users/nophoto.jpg" %}
+                  {% set photoA2 = "../static/photos/users/nophoto.jpg" %}
+                {% endif %}
+                {% set playerId = data.gm_idPlayer_B1 %}
+                {% set photoB1 = "../static/photos/users/" + data.gm_idPlayer_B1|string + "/main.jpg"  %}
+  
+                {% set playerId = data.gm_idPlayer_B2 %}
+                {% set photoB2 = "../static/photos/users/" + data.gm_idPlayer_B2|string + "/main.jpg"  %}
+                <br>
+                <div class="player">ID: {{ data.gm_id }}</div>
+                {% if data.gm_idPlayer_A1 %}
+                  <div class="team">
+                    <div class="player">
+                      <img width="50" height="57" alt="" src="{{ photoA1 }}">
+                    </div>
+                    <div class="player">
+                      <img width="50" height="57" alt="" src="{{ photoA2 }}">
+                    </div>
+                    <div class="nombres">
+                      <div>{{ data.gm_namePlayer_A1 }}</div>
+                      <div>{{ data.gm_namePlayer_A2 }}</div>
+                    </div>
+                  </div>
+                  <div class="marcador-wrapper">
+                    <div class="marcador" style="color: rgb(255, 255, 255);">{{ data.gm_result_A }}</div>
+                  </div>
+                {% endif %}
+                {% if data.gm_idPlayer_B1 %}
+                  <div class="team">
+                    <div class="player">
+                      <img width="50" height="57" alt="" src="{{ photoB1 }}">
+                    </div>
+                    <div class="player">
+                      <img width="50" height="57" alt="" src="{{ photoB2 }}">
+                    </div>
+                    <div class="nombres">
+                      <div>{{ data.gm_namePlayer_B1 }}</div>
+                      <div>{{ data.gm_namePlayer_B2 }}</div>
+                    </div>
+                  </div>
+                  <div class="marcador-wrapper">
+                    <div class="marcador" style="color: rgb(255, 255, 255);">{{ data.gm_result_B }}</div>
+                  </div>
+                {% endif %}
+              </div>
+              {% if data.gm_points_var|round(2)>0 %}
+                <div class="player">Rank: {{ data.gm_points_var|round(2) }}</div>
+              {% endif %}
+            </div>
+          </div>  
+        </div>
+      </div>
+    {% endfor %}
+</div> <!--END ROW -->
+ 
+ 
+<!-- Chart js -->
+<script src="../static/plugins/Chart.js/Chart.min.js"></script>
+<!-- Index js -->
+<script src="../static/js/index.js"></script>
+
+<script>
+  const xValues = [];
+  const yValues = [];
+  xValues[0]= 0;
+  yValues[0]= 1000;
+  {% for dataELO in rankingELO_hist %}
+      {% set index = loop.length - loop.index0 - 1 %}
+      xValues[{{ index }}] = {{ dataELO[0] }};
+      yValues[{{ index }}] = {{ dataELO[9] }};
+  {% endfor %}
+
+  const xValuesShort = [];
+  const yValuesShort = [];
+  {% for dataELOShort in rankingELO_histShort %}
+      {% set index = loop.length - loop.index0 - 1 %}
+      xValuesShort[{{ index }}] = {{ dataELOShort[0] }};
+      yValuesShort[{{ index }}] = {{ dataELOShort[9] }};
+  {% endfor %}
+
+  new Chart("ELO_Chart", {
+    type: "line",
+    data: {
+      labels: xValues,
+      datasets: [{
+        label: 'Ranking',
+        data: yValues,
+        backgroundColor: 'rgba(255, 255, 255, 0.25)',
+        borderColor: "transparent",
+        pointRadius :"0",
+        borderWidth: 1
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      legend: {
+        display: false,
+        labels: {
+          fontColor: '#ddd',  
+          boxWidth:40
+        }
+      },
+      tooltips: {
+        displayColors:false
+      },  
+      scales: {
+        xAxes: [{
+          ticks: {
+            beginAtZero:true,
+            fontColor: '#ddd'
+          },
+          gridLines: {
+            display: true ,
+            color: "rgba(221, 221, 221, 0.08)"
+          },
+        }],
+        yAxes: [{
+          ticks: {
+            beginAtZero:false,
+            fontColor: '#ddd'
+          },
+          gridLines: {
+            display: true ,
+            color: "rgba(221, 221, 221, 0.08)"
+          },
+        }]
+       }
+     }
+  });
+
+  new Chart("ELO_ChartShort", {
+    type: "line",
+    data: {
+      labels: xValuesShort,
+      datasets: [{
+        label: 'Ranking',
+        data: yValuesShort,
+        backgroundColor: 'rgba(255, 255, 255, 0.25)',
+        borderColor: "transparent",
+        pointRadius :"0",
+        borderWidth: 1
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      legend: {
+        display: false,
+        labels: {
+          fontColor: '#ddd',  
+          boxWidth:40
+        }
+      },
+      tooltips: {
+        displayColors:false
+      },  
+      scales: {
+        xAxes: [{
+          ticks: {
+            beginAtZero:true,
+            fontColor: '#ddd'
+          },
+          gridLines: {
+            display: true ,
+            color: "rgba(221, 221, 221, 0.08)"
+          },
+        }],
+        yAxes: [{
+          ticks: {
+            beginAtZero:false,
+            fontColor: '#ddd'
+          },
+          gridLines: {
+            display: true ,
+            color: "rgba(221, 221, 221, 0.08)"
+          },
+        }]
+       }
+     }
+  });
+
+</script>
+
+
+
+
+{% endblock %}

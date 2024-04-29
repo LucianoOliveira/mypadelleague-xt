@@ -1,0 +1,32 @@
+.Court {
+    border: 2px solid transparent;
+    border-radius: 5px;
+    margin: 10px;
+    padding: 10px;
+    display: inline-block;
+    text-align: center; /* Center text horizontally */
+}
+.Court img {
+    display: block;
+    margin: 0 auto; /* Center image horizontally */
+}
+.selectedCourt {
+    border-color: blue;
+}
+.hiddenCourt {
+    border-color: green;
+}
+
+.nameContainer {
+    width: 103px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.nameContainerELO {
+    width: 50px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

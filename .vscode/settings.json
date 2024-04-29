@@ -1,0 +1,29 @@
+{
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default"
+            },
+            "previewLimit": 50,
+            "server": "192.168.1.112",
+            "port": 3306,
+            "driver": "MariaDB",
+            "database": "myPadelLeague",
+            "username": "admin",
+            "password": "sqlI1020558",
+            "name": "pilampCon"
+        },
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "name": "mypadelleagueRioDB",
+            "database": "${workspaceFolder:mypadelleague+rio}/instance/database.db"
+        },
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "name": "mypadelleagueXTDB",
+            "database": "${workspaceFolder:mypadelleague+xt}/instance/database.db"
+        }
+    ]
+}

@@ -1,0 +1,134 @@
+{% extends "base.html" %} {% block title %}XT Padel League{% endblock %} 
+{% block content %}
+<!-- WPT -->
+<link href="../static/css/swiper-bundle.min.css" rel="stylesheet"/>
+<!-- Show front page of gameday -->
+
+<!-- Games Row -->
+<div class="row">
+    {% for data in result %}
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+          </div>
+          <div class="card-body">
+            <div class="swiper-slide" data-swiper-slide-index="1" style="width: 325px; left: 0px; margin-right: 1px;" role="group" aria-label="3 / 28">
+              <div id="partido1B" class="slideoculto">
+                <div style="width: 100%; height: 140px;"> 
+                  <a href="https://www.worldpadeltour.com/marcador" target="_parent">
+                    <img src="swipper/score1.png" style="width:50%;margin-top:5%;float:left;">
+                  </a> 
+                  <a href="https://www.worldpadeltour.com/stats/54484" target="_parent">
+                    <img src="swipper/stats.png" style="width:50%;margin-top:5%;float:left;">
+                  </a>
+                </div>
+              </div>
+              <div id="partido1A" style="width: 100%;height: 192px;padding: 10px;">
+                <div class="fase">{{ data['gm_court'] }}</div>
+                <div class="fecha">{{ data['gm_timeStart'] }}</div>
+                {% if data['gm_idPlayer_A1'] != '' %}
+                  {% set playerId = data['gm_idPlayer_A1'] %}
+                  {% set photoA1 = "../static/photos/users/" + data['gm_idPlayer_A1']|string + "/main.jpg"  %}
+  
+                  {% set playerId = data['gm_idPlayer_A2'] %}
+                  {% set photoA2 = "../static/photos/users/" + data['gm_idPlayer_A2']|string + "/main.jpg" %}
+                {% else %}
+                  {% set photoA1 = "../static/photos/users/nophoto.jpg" %}
+                  {% set photoA2 = "../static/photos/users/nophoto.jpg" %}
+                {% endif %}
+  
+                {% set playerId = data['gm_idPlayer_B1'] %}
+                {% set photoB1 = "../static/photos/users/" + data['gm_idPlayer_B1']|string + "/main.jpg"  %}
+  
+                {% set playerId = data['gm_idPlayer_B2'] %}
+                {% set photoB2 = "../static/photos/users/" + data['gm_idPlayer_B2']|string + "/main.jpg"  %}
+                
+                <div class="team">
+                  <div class="player">
+                    <img width="50" height="57" alt="" src="{{ photoA1 }}">
+                  </div>
+                  <div class="player">
+                    <img width="50" height="57" alt="" src="{{ photoA2 }}">
+                  </div>
+                  <div class="nombres">
+                    <!-- <div>{{ acronA1 }}</div>
+                    <div>{{ acronA2 }}</div> -->
+                    <div>{{ data['gm_namePlayer_A1'] }}</div>
+                    <div>{{ data['gm_namePlayer_A2'] }}</div>
+                  </div>
+                </div>
+                <div class="marcador-wrapper">
+                  <div class="marcador" style="color: rgb(255, 255, 255);">{{ data['gm_result_A'] }}</div>
+                </div>
+                <div class="team">
+                  <div class="player">
+                    <img width="50" height="57" alt="" src="{{ photoB1 }}">
+                  </div>
+                  <div class="player">
+                    <img width="50" height="57" alt="" src="{{ photoB2 }}">
+                  </div>
+                  <div class="nombres">
+                    <div>{{ data['gm_namePlayer_B1'] }}</div>
+                    <div>{{ data['gm_namePlayer_B2'] }}</div>
+                  </div>
+                </div>
+                <div class="marcador-wrapper">
+                  <div class="marcador" style="color: rgb(255, 255, 255);">{{ data['gm_result_B'] }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+
+  <!-- Second Row -->
+<div class="row">
+    <!-- Table of classification -->
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Classificação Evento</h5>
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <!-- <th scope="col">#</th> -->
+                  <th class="" scope="col">Nome</th>
+                  <th class="" scope="col">Pts</th>
+                  <th class="d-none d-md-table-cell" scope="col">PG</th>
+                  <th class="d-none d-md-table-cell" scope="col">PP</th>
+                  <th class="d-none d-xl-table-cell" scope="col">JG</th>
+                  <th class="d-none d-xl-table-cell" scope="col">JP</th>
+                  <th class="" scope="col">JD</th>
+                  <!-- <th class="d-none d-xl-table-cell" scope="col">Ranking</th> -->
+                </tr>
+              </thead>
+              <tbody>
+                {% for data in classification %}
+                  <tr>
+                    <!-- <th scope="row">{{ data['gc_idPlayer'] }}</th> -->
+                    {% set photoPath = "../static/photos/users/" + data['gc_idPlayer']|string + "/main.jpg"  %}
+                    <td class=""  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';"><img src="{{ photoPath }}" alt="Admin" class="rounded-circle" width="40"> {{ data['gc_namePlayer'] }}</td>
+                    <td class=""  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';">{{ data['gc_points'] }}</td>  
+                    <td class="d-none d-md-table-cell"  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';">{{ data['gc_wins'] }}</td> 
+                    <td class="d-none d-md-table-cell"  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';">{{ data['gc_losses'] }}</td> 
+                    <td class="d-none d-xl-table-cell"  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';">{{ data['gc_gamesFavor'] }}</td> 
+                    <td class="d-none d-xl-table-cell"  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';">{{ data['gc_gamesAgainst'] }}</td> 
+                    <td class=""  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';">{{ data['gc_gamesDiff'] }}</td> 
+                    <!-- <td class="d-none d-xl-table-cell"  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';">{{ data['gc_ranking'] }}</td>  -->
+                  </tr> 
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!--End Row-->
+  
+  
+
+{% endblock %}

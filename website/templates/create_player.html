@@ -1,0 +1,51 @@
+{% extends "base.html" %} {% block title %}XT Padel League{% endblock %} {% block content %}
+ 
+<div class="clearfix"></div>
+	
+<div class="container-fluid">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="card-title">Criar Novo Jogador</div>
+                <hr>
+                <form action="{{ url_for('views.insertPlayer') }}" method="post" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="player_name">Nome</label>
+                        <input type="text" class="form-control form-control-rounded" id="player_name" placeholder="Nome do jogador" name="player_name">
+                    </div>
+                    <div class="form-group">
+                        <label for="player_email">Email</label>
+                        <input type="text" class="form-control form-control-rounded" id="player_email" placeholder="Email" name="player_email">
+                    </div>
+                    <div class="form-group">
+                        <label for="player_dob">Data de Nascimento</label>
+                        <input type="date" class="form-control form-control-rounded" id="player_dob" placeholder="Calendario escolher data de nascimento" name="player_dob">
+                    </div>
+                    <div class="form-group">
+                        <label for="player_gender">Categoria</label>
+                        <select class="form-control form-control-rounded" id="player_category" name="player_category">
+                            <option value="800">M/F 5</option>
+                            <option value="1000">M/F 4</option>
+                            <option value="1200">M/F 3</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="player_photo">Fotografia</label>
+                        <input type="file" class="form-control form-control-rounded" id="player_photo" placeholder="Fotografia" name="player_photo">
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-light btn-round px-5"><i class="icon-save"></i> Criar Jogador</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!--start overlay-->
+    <div class="overlay toggle-menu"></div>
+    <!--end overlay-->
+
+</div>
+<!-- End container-fluid-->
+    
+
+{% endblock %}

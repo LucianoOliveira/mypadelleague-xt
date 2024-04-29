@@ -1,0 +1,82 @@
+{% extends "base.html" %} {% block title %}XT Padel League{% endblock %} 
+{% block content %}
+<!-- Show front page of league -->
+
+<!-- Table of gamedays -->
+<div class="row">
+    {% for data in result %}
+    <div class="col-lg-5">
+        <a href="{{ url_for('views.gameDay_detail', gameDayID=data['gd_id']) }}">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">{{ league.lg_name }}</h5>
+                </div>
+                <div class="card-body">
+                    <br>Data : {{ data['gd_date'] }}</br>
+                    <br>Estado : {{ data['gd_status'] }}</br>
+                    {% if data['gd_status'] == 'Terminado' %}
+                        <br>Vencedores: {{ data['gd_nameWinner1'] }} / {{ data['gd_nameWinner2'] }}</br>
+                    {% else %}
+                        <br>Vencedores: </br>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div><!-- End Row -->
+
+<!-- if league tipe is 6 don't show classification, as this is justa a placeholder for random games -->
+{% if league.lg_id_tp !=6 %}
+<!-- Table of classification -->
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Classificação Geral</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <!-- <th scope="col">#</th> -->
+                                <th class="" scope="col">Nome</th>
+                                <th class="" scope="col">Pts</th>
+                                <th class="d-none d-md-table-cell" scope="col">PG</th>
+                                <th class="d-none d-md-table-cell" scope="col">PP</th>
+                                <th class="d-none d-xl-table-cell" scope="col">JG</th>
+                                <th class="d-none d-xl-table-cell" scope="col">JP</th>
+                                <th class="d-none d-xl-table-cell" scope="col">JD</th>
+                                <!-- <th class="d-none d-xl-table-cell" scope="col">Ranking</th> -->
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for data in classification %}
+                            <tr data-href="{{ url_for('views.player_detail', playerID=data['lc_idPlayer']) }}">
+                                <!-- <th scope="row">{{ data['lc_idPlayer'] }}</th> -->
+                                <td class=""  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['lc_idPlayer']) }}';">
+                                    <img src="{{ url_for('views.display_user_image', userID=data['lc_idPlayer'] ) }}" alt="{{ data['lc_namePlayer'] }}" class="rounded-circle" width="40">
+                                    {{ data['lc_namePlayer'] }}
+                                </td>
+                                <td class="" onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['lc_idPlayer']) }}';">{{ data['lc_points'] }}</td>
+                                <td class="d-none d-md-table-cell" onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['lc_idPlayer']) }}';">{{ data['lc_wins'] }}</td>
+                                <td class="d-none d-md-table-cell" onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['lc_idPlayer']) }}';">{{ data['lc_losses'] }}</td>
+                                <td class="d-none d-xl-table-cell" onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['lc_idPlayer']) }}';">{{ data['lc_gamesFavor'] }}</td>
+                                <td class="d-none d-xl-table-cell" onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['lc_idPlayer']) }}';">{{ data['lc_gamesAgainst'] }}</td>
+                                <td class="d-none d-xl-table-cell" onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['lc_idPlayer']) }}';">{{ data['lc_gamesDiff'] }}</td>
+                                <!-- <td class="d-none d-xl-table-cell" onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['lc_idPlayer']) }}';">{{ data['lc_ranking'] }}</td> -->
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div><!-- End Row -->
+{% endif %}
+
+
+
+
+
+{% endblock %}
