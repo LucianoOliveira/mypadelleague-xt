@@ -609,7 +609,7 @@ def player_detail(playerID):
     # All games
     try:
         games_query = db.session.execute(
-            text(f"SELECT gm_timeStart, gm_timeEnd, gm_court, gm_namePlayer_A1, gm_namePlayer_A2, gm_result_A, gm_result_B, gm_namePlayer_B1, gm_namePlayer_B2, gm_id, gm_idPlayer_A1, gm_idPlayer_A2, gm_idPlayer_B1, gm_idPlayer_B2, gm_date, (el_afterRank - el_beforeRank) AS gm_points_var FROM tb_game JOIN tb_ELO_ranking_hist ON tb_ELO_ranking_hist.el_gm_id = tb_game.gm_id AND tb_ELO_ranking_hist.el_pl_id = :playerID WHERE (gm_idPlayer_A1 = :playerID OR gm_idPlayer_A2 = :playerID OR gm_idPlayer_B1 = :playerID OR gm_idPlayer_B2 = :playerID) AND (gm_result_A > 0 OR gm_result_B > 0) ORDER BY gm_date DESC, gm_timeStart DESC"),
+            text(f"SELECT gm_timeStart, gm_timeEnd, gm_court, CASE WHEN instr(gm_namePlayer_A1, '\"') > 0 AND instr(substr(gm_namePlayer_A1, instr(gm_namePlayer_A1, '\"') + 1), '\"') > 0 THEN substr(gm_namePlayer_A1, instr(gm_namePlayer_A1, '\"') + 1, instr(substr(gm_namePlayer_A1, instr(gm_namePlayer_A1, '\"') + 1), '\"') - 1) ELSE gm_namePlayer_A1 END AS gm_namePlayer_A1, CASE WHEN instr(gm_namePlayer_A2, '\"') > 0 AND instr(substr(gm_namePlayer_A2, instr(gm_namePlayer_A2, '\"') + 1), '\"') > 0 THEN substr(gm_namePlayer_A2, instr(gm_namePlayer_A2, '\"') + 1, instr(substr(gm_namePlayer_A2, instr(gm_namePlayer_A2, '\"') + 1), '\"') - 1) ELSE gm_namePlayer_A2 END AS gm_namePlayer_A2, gm_result_A, gm_result_B, CASE WHEN instr(gm_namePlayer_B1, '\"') > 0 AND instr(substr(gm_namePlayer_B1, instr(gm_namePlayer_B1, '\"') + 1), '\"') > 0 THEN substr(gm_namePlayer_B1, instr(gm_namePlayer_B1, '\"') + 1, instr(substr(gm_namePlayer_B1, instr(gm_namePlayer_B1, '\"') + 1), '\"') - 1) ELSE gm_namePlayer_B1 END AS gm_namePlayer_B1, CASE WHEN instr(gm_namePlayer_B2, '\"') > 0 AND instr(substr(gm_namePlayer_B2, instr(gm_namePlayer_B2, '\"') + 1), '\"') > 0 THEN substr(gm_namePlayer_B2, instr(gm_namePlayer_B2, '\"') + 1, instr(substr(gm_namePlayer_B2, instr(gm_namePlayer_B2, '\"') + 1), '\"') - 1) ELSE gm_namePlayer_B2 END AS gm_namePlayer_B2, gm_id, gm_idPlayer_A1, gm_idPlayer_A2, gm_idPlayer_B1, gm_idPlayer_B2, gm_date, (el_afterRank - el_beforeRank) AS gm_points_var FROM tb_game JOIN tb_ELO_ranking_hist ON tb_ELO_ranking_hist.el_gm_id = tb_game.gm_id AND tb_ELO_ranking_hist.el_pl_id = :playerID WHERE (gm_idPlayer_A1 = :playerID OR gm_idPlayer_A2 = :playerID OR gm_idPlayer_B1 = :playerID OR gm_idPlayer_B2 = :playerID) AND (gm_result_A > 0 OR gm_result_B > 0) ORDER BY gm_date DESC, gm_timeStart DESC"),
             {"playerID": playerID},
         ).fetchall()
     except Exception as e:
@@ -785,10 +785,20 @@ def player_detail(playerID):
     else:
         rankingELO_bestWorst=[1000,1000,1000]
 
+    # Splitting the player name based on double quotes
+    name_parts = current_Player.pl_name.split('"')
+
+    # Extracting the short name based on the number of parts after splitting
+    if len(name_parts) > 1:
+        player_name_short = name_parts[1]  # If there is a name enclosed in double quotes
+    else:
+        player_name_short = name_parts[0]  # If there is no name enclosed in double quotes
+    
     # DONE - Get data from games to complete user data
     player_data = {
         "player_id": current_Player.pl_id,
         "player_name": current_Player.pl_name,
+        "player_name_short": player_name_short,
         "player_email": current_Player.pl_email,
         "player_birthday": current_Player.pl_birthday,
         "numGameDayWins": num_game_day_won_text,
@@ -839,7 +849,7 @@ def player_edit(playerID):
     # # All games
     try:
         games_query = db.session.execute(
-            text(f"SELECT gm_timeStart, gm_timeEnd, gm_court, gm_namePlayer_A1, gm_namePlayer_A2, gm_result_A, gm_result_B, gm_namePlayer_B1, gm_namePlayer_B2, gm_id, gm_idPlayer_A1, gm_idPlayer_A2, gm_idPlayer_B1, gm_idPlayer_B2, gm_date, (el_afterRank - el_beforeRank) AS gm_points_var FROM tb_game JOIN tb_ELO_ranking_hist ON tb_ELO_ranking_hist.el_gm_id = tb_game.gm_id AND tb_ELO_ranking_hist.el_pl_id = :playerID WHERE (gm_idPlayer_A1 = :playerID OR gm_idPlayer_A2 = :playerID OR gm_idPlayer_B1 = :playerID OR gm_idPlayer_B2 = :playerID) AND (gm_result_A > 0 OR gm_result_B > 0) ORDER BY gm_date DESC, gm_timeStart DESC"),
+            text(f"SELECT gm_timeStart, gm_timeEnd, gm_court, CASE WHEN instr(gm_namePlayer_A1, '\"') > 0 AND instr(substr(gm_namePlayer_A1, instr(gm_namePlayer_A1, '\"') + 1), '\"') > 0 THEN substr(gm_namePlayer_A1, instr(gm_namePlayer_A1, '\"') + 1, instr(substr(gm_namePlayer_A1, instr(gm_namePlayer_A1, '\"') + 1), '\"') - 1) ELSE gm_namePlayer_A1 END AS gm_namePlayer_A1, CASE WHEN instr(gm_namePlayer_A2, '\"') > 0 AND instr(substr(gm_namePlayer_A2, instr(gm_namePlayer_A2, '\"') + 1), '\"') > 0 THEN substr(gm_namePlayer_A2, instr(gm_namePlayer_A2, '\"') + 1, instr(substr(gm_namePlayer_A2, instr(gm_namePlayer_A2, '\"') + 1), '\"') - 1) ELSE gm_namePlayer_A2 END AS gm_namePlayer_A2, gm_result_A, gm_result_B, CASE WHEN instr(gm_namePlayer_B1, '\"') > 0 AND instr(substr(gm_namePlayer_B1, instr(gm_namePlayer_B1, '\"') + 1), '\"') > 0 THEN substr(gm_namePlayer_B1, instr(gm_namePlayer_B1, '\"') + 1, instr(substr(gm_namePlayer_B1, instr(gm_namePlayer_B1, '\"') + 1), '\"') - 1) ELSE gm_namePlayer_B1 END AS gm_namePlayer_B1, CASE WHEN instr(gm_namePlayer_B2, '\"') > 0 AND instr(substr(gm_namePlayer_B2, instr(gm_namePlayer_B2, '\"') + 1), '\"') > 0 THEN substr(gm_namePlayer_B2, instr(gm_namePlayer_B2, '\"') + 1, instr(substr(gm_namePlayer_B2, instr(gm_namePlayer_B2, '\"') + 1), '\"') - 1) ELSE gm_namePlayer_B2 END AS gm_namePlayer_B2, gm_id, gm_idPlayer_A1, gm_idPlayer_A2, gm_idPlayer_B1, gm_idPlayer_B2, gm_date, (el_afterRank - el_beforeRank) AS gm_points_var FROM tb_game JOIN tb_ELO_ranking_hist ON tb_ELO_ranking_hist.el_gm_id = tb_game.gm_id AND tb_ELO_ranking_hist.el_pl_id = :playerID WHERE (gm_idPlayer_A1 = :playerID OR gm_idPlayer_A2 = :playerID OR gm_idPlayer_B1 = :playerID OR gm_idPlayer_B2 = :playerID) AND (gm_result_A > 0 OR gm_result_B > 0) ORDER BY gm_date DESC, gm_timeStart DESC"),
             {"playerID": playerID},
         ).fetchall()
     except Exception as e:

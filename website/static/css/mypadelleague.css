@@ -18,15 +18,19 @@
 }
 
 .nameContainer {
-    width: 103px;
+    width: 108px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 .nameContainerELO {
-    width: 50px;
+    width: 108px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: middle;
 }
