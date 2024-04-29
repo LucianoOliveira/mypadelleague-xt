@@ -38,7 +38,8 @@
                                 {% if data['pl_id'] %}
                                 <td class=""  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['pl_id']) }}';">
                                     <img src="{{ url_for('views.display_user_image', userID=data['pl_id'] ) }}" alt="{{ data['pl_name'] }}" class="rounded-circle" width="40" onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['pl_id']) }}';"> 
-                                    <span style="max-width: 50px;"> {{ data['pl_name'] }}</span>
+                                    <!-- <span style="max-width: 50px;"> {{ data['pl_name'] }}</span> -->
+                                    <span style="max-width: 50px;"> {{ data['pl_name_short'] }}</span>
                                 </td>
                                 {% else %}
                                 <td class=""><img src="{{ url_for('views.display_user_image', userID=0 ) }}" alt="Admin" class="rounded-circle" width="40"> {{ data['pl_name'] }}</td>

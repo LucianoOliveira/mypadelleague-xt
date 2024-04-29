@@ -67,7 +67,7 @@ def managementPlayers():
 @views.route('/rankingELO')
 def rankingELO():
     results = db.session.execute(
-        text(f"SELECT pl_id, pl_name, ROUND(pl_rankingNow, 2) as pl_rankingNow, ROUND(pl_totalRankingOpo, 2) as pl_totalRankingOpo, pl_wins, pl_losses, pl_totalGames FROM tb_ELO_ranking  order by pl_rankingNow desc"),
+        text(f"SELECT pl_id, pl_name, ROUND(pl_rankingNow, 2) as pl_rankingNow, ROUND(pl_totalRankingOpo, 2) as pl_totalRankingOpo, pl_wins, pl_losses, pl_totalGames, CASE WHEN instr(pl_name, '\"') > 0 AND instr(substr(pl_name, instr(pl_name, '\"') + 1), '\"') > 0 THEN substr(pl_name, instr(pl_name, '\"') + 1, instr(substr(pl_name, instr(pl_name, '\"') + 1), '\"') - 1) ELSE pl_name END AS pl_name_short FROM tb_ELO_ranking WHERE pl_id in (SELECT pl_id from tb_players where pl_ranking_stat='Y') order by pl_rankingNow desc"),
     ).fetchall()   
     
     return render_template("rankingELO.html", user=current_user, result=results)
@@ -1012,11 +1012,21 @@ def player_edit(playerID):
         rankingELO_bestWorst = rankingELO_bestWorst0
     else:
         rankingELO_bestWorst=[1000,1000,1000]
+
+    # Splitting the player name based on double quotes
+    name_parts = current_Player.pl_name.split('"')
+
+    # Extracting the short name based on the number of parts after splitting
+    if len(name_parts) > 1:
+        player_name_short = name_parts[1]  # If there is a name enclosed in double quotes
+    else:
+        player_name_short = name_parts[0]  # If there is no name enclosed in double quotes
     
     # DONE - Get data from games to complete user data
     player_data = {
         "player_id": current_Player.pl_id,
         "player_name": current_Player.pl_name,
+        "player_name_short": player_name_short,
         "player_email": current_Player.pl_email,
         "player_birthday": current_Player.pl_birthday,
         "player_category": 1000,
@@ -1422,11 +1432,11 @@ def ranking_elo_week():
     results = db.session.execute(
         text(
             "SELECT p.pl_id AS pl_id, p.pl_name as pl_name, "
-            "p.pl_name as pl_name_short, "
-            # "CASE "
-            # "WHEN p.pl_name LIKE '%' '\"' '%' THEN TRIM(BOTH '\"' FROM SUBSTRING_INDEX(SUBSTRING_INDEX(p.pl_name, '\"', 2), '\"', -1)) "
-            # "ELSE CONCAT_WS(' ', SUBSTRING_INDEX(p.pl_name, ' ', 1), SUBSTRING_INDEX(p.pl_name, ' ', -1)) "
-            # "END AS pl_name_short, "
+            "CASE "
+            "WHEN instr(p.pl_name, '\"') > 0 AND instr(substr(p.pl_name, instr(p.pl_name, '\"') + 1), '\"') > 0 THEN "
+            " substr(p.pl_name, instr(p.pl_name, '\"') + 1, instr(substr(p.pl_name, instr(p.pl_name, '\"') + 1), '\"') - 1)"
+            "ELSE p.pl_name "
+            "END AS pl_name_short, "
             "ROUND(e.el_AfterRank, 2) as pl_rankingNow "
             "FROM tb_players p "
             "LEFT JOIN tb_ELO_ranking_hist e ON p.pl_id = e.el_pl_id "
