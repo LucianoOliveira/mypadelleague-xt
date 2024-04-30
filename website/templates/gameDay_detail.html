@@ -53,8 +53,8 @@
                   <div class="nombres">
                     <!-- <div>{{ acronA1 }}</div>
                     <div>{{ acronA2 }}</div> -->
-                    <div>{{ data['gm_namePlayer_A1'] }}</div>
-                    <div>{{ data['gm_namePlayer_A2'] }}</div>
+                    <div>{{ display_short_name(data['gm_namePlayer_A1']) }}</div>
+                    <div>{{ display_short_name(data['gm_namePlayer_A2']) }}</div>
                   </div>
                 </div>
                 <div class="marcador-wrapper">
@@ -68,8 +68,8 @@
                     <img width="50" height="57" alt="" src="{{ photoB2 }}">
                   </div>
                   <div class="nombres">
-                    <div>{{ data['gm_namePlayer_B1'] }}</div>
-                    <div>{{ data['gm_namePlayer_B2'] }}</div>
+                    <div>{{ display_short_name(data['gm_namePlayer_B1']) }}</div>
+                    <div>{{ display_short_name(data['gm_namePlayer_B2']) }}</div>
                   </div>
                 </div>
                 <div class="marcador-wrapper">
@@ -111,7 +111,7 @@
                   <tr>
                     <!-- <th scope="row">{{ data['gc_idPlayer'] }}</th> -->
                     {% set photoPath = "../static/photos/users/" + data['gc_idPlayer']|string + "/main.jpg"  %}
-                    <td class=""  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';"><img src="{{ photoPath }}" alt="Admin" class="rounded-circle" width="40"> {{ data['gc_namePlayer'] }}</td>
+                    <td class=""  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';"><img src="{{ photoPath }}" alt="Admin" class="rounded-circle" width="40"> {{ display_short_name(data['gc_namePlayer']) }}</td>
                     <td class=""  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';">{{ data['gc_points'] }}</td>  
                     <td class="d-none d-md-table-cell"  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';">{{ data['gc_wins'] }}</td> 
                     <td class="d-none d-md-table-cell"  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['gc_idPlayer']) }}';">{{ data['gc_losses'] }}</td> 

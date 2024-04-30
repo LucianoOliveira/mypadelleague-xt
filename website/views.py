@@ -32,7 +32,11 @@ def players():
 @views.route('/league/<leagueID>')
 def league_detail(leagueID):
     league_data = League.query.filter_by(lg_id=leagueID).first()
-    result = GameDay.query.filter_by(gd_idLeague=leagueID).all()
+    if league_data.lg_id_tp != 6:
+        result = GameDay.query.filter_by(gd_idLeague=leagueID).all()
+    else:
+        result = GameDay.query.filter_by(gd_idLeague=leagueID).order_by(desc(GameDay.gd_date)).all()
+
     classification = LeagueClassification.query.filter_by(lc_idLeague=leagueID).order_by(desc(LeagueClassification.lc_ranking)).all()
     return render_template("league_detail.html", user=current_user, league=league_data, result=result, classification=classification) 
 
@@ -1067,7 +1071,6 @@ def display_user_image(userID):
         return redirect(url_for('static', filename='photos/users/'+ str(userID)+'/main.jpg'), code=301)
     else:
         return redirect(url_for('static', filename='photos/users/nophoto.jpg'), code=301)
-    
 
 @views.route('/display_league_image_big/<leagueID>')
 def display_league_image_big(leagueID):

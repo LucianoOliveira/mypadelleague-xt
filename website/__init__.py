@@ -2,6 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from os import path
 from flask_login import LoginManager
+import re
 
 db = SQLAlchemy()
 DB_NAME = "database.db"
@@ -40,7 +41,17 @@ def create_app():
         age = today.year - birthdate.year - ((today.month, today.day) < (birthdate.month, birthdate.day))
         return age
     
+    def display_short_name(long_name):
+        match = re.search(r'"(.*?)"', long_name)
+        if match:
+            short_name= match.group(1)
+        else:
+            short_name = long_name
+        return short_name
+    
     # Make the calculate_age function accessible to the entire application
     app.jinja_env.globals.update(calculate_age=calculate_age)
+    # Make the display_short_name function accessible to the entire application
+    app.jinja_env.globals.update(display_short_name=display_short_name)
 
     return app

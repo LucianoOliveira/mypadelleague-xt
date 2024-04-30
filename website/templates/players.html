@@ -21,7 +21,7 @@
                                 <td onclick="window.location.href='{{ url_for('views.player_detail', playerID=player.pl_id) }}';">
                                     <img src="{{ url_for('views.display_user_image', userID=player.pl_id ) }}" 
                                         alt="{{ player.pl_name }}" class="rounded-circle" width="40">    
-                                    {{ player.pl_name }}
+                                    {{ display_short_name(player.pl_name) }}
                                 </td>
                                 <td onclick="window.location.href='{{ url_for('views.player_detail', playerID=player.pl_id) }}';">{{ calculate_age(player.pl_birthday) }}</td>
                             </tr>
