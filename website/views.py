@@ -58,7 +58,7 @@ def managementLeague():
 @login_required
 def managementLeague_detail(leagueID):
     league_data = League.query.filter_by(lg_id=leagueID).first()
-    result = GameDay.query.filter_by(gd_idLeague=leagueID).all()
+    result = GameDay.query.filter_by(gd_idLeague=leagueID).order_by(desc(GameDay.gd_date)).all()
     classification = LeagueClassification.query.filter_by(lc_idLeague=leagueID).order_by(desc(LeagueClassification.lc_ranking)).all()
     return render_template("managementLeague_detail.html", user=current_user, league=league_data, result=result, classification=classification)
 
@@ -156,7 +156,10 @@ def managementGameDay_detail(gameDayID):
     gameDayPlayers = GameDayPlayer.query.filter_by(gp_idGameDay=gameDayID).all()
     number_of_teamsGD = len(gameDayPlayers)
     league = League.query.filter_by(lg_id=gameDay_data.gd_idLeague).first()
-    number_of_teams_league = league.lg_nbrTeams
+    if league.lg_id_tp != 6:
+        number_of_teams_league = league.lg_nbrTeams
+    else:
+        number_of_teams_league = gameDay_data.gd_teamNum
     players_data = Players.query.order_by(Players.pl_name).all()
     league_id = league.lg_id
     gameDay_id = gameDayID
@@ -259,11 +262,18 @@ def insert_game_day_players(gameDayID):
     gameDay_id = gameDayID
     type_of_teams = request.form.get('defineTeams')
     alpha_arr = [chr(i) for i in range(ord('A'), ord('Z') + 1)]
+    league = League.query.filter_by(lg_id=leagueID).first()
     league_info = League.query.with_entities(League.lg_nbrTeams).filter_by(lg_id=league_id).first()
     if league_info:
-        num_players = league_info[0] * 2
+        if league.lg_id_tp != 6:
+            num_players = league_info[0] * 2
+        else:
+            num_players = gameDay_data.gd_teamNum*2
     else:
-        num_players = 0
+        if league.lg_id_tp != 6:
+            num_players = 0
+        else:
+            num_players = gameDay_data.gd_teamNum*2
 
     # before doing anything we should delete all the players from the gameday and update classification
     func_delete_gameday_players_upd_class(gameDayID)
@@ -548,39 +558,51 @@ def insert_game_day_players(gameDayID):
 @views.route('/insertGameDay/<leagueID>', methods=['GET', 'POST'])
 @login_required
 def insertGameDay(leagueID):
-    print("Here")
     try:
         league_id = leagueID
         #TODO - Read from league the number of teams and put into gameDay_teamNum
         leagueInfo = db.session.execute(text(f"SELECT lg_nbrTeams, lg_minWarmUp, lg_minPerGame, lg_minBetweenGames FROM tb_league WHERE lg_id=:league_id"), {'league_id': league_id}).fetchone()
-        gameDay_teamNum = leagueInfo[0]
+        gameDay_teamNum = request.form.get('number_teams')
+        gameDay_teamNum = int(gameDay_teamNum)
         gameDay_date = request.form.get('gameDay_dateStart')
         gameDay_time = request.form.get('gameDay_timeStart')
-        warm_up = leagueInfo[1]
-        minPerGame = leagueInfo[2]
-        minBetweenGames = leagueInfo[3]
-        first_game_time_start = gameDay_time+warm_up
-        first_game_time_end = first_game_time_start+minPerGame
-        second_game_time_start = first_game_time_end+minBetweenGames
-        second_game_time_end = second_game_time_start+minPerGame
-        third_game_time_start = second_game_time_end+minBetweenGames
-        third_game_time_end = third_game_time_start+minPerGame
+        # warm_up = leagueInfo[1]
+        # minPerGame = leagueInfo[2]
+        # minBetweenGames = leagueInfo[3]
+        # gameDay_datetime = datetime.strptime(gameDay_date + " " + gameDay_time, "%Y-%m-%d %H:%M")
+        # gameDay_timeStart = gameDay_datetime.time()
+        # first_game_time_start = datetime.combine(gameDay_datetime.date(), gameDay_timeStart) + timedelta(minutes=warm_up)
+        # first_game_time_end = first_game_time_start+timedelta(minutes=minPerGame)
+        # if gameDay_teamNum>2:
+        #     second_game_time_start = first_game_time_end+timedelta(minutes=minBetweenGames)
+        #     second_game_time_end = second_game_time_start+timedelta(minutes=minPerGame)
+        #     if gameDay_teamNum>3:
+        #         third_game_time_start = second_game_time_end+timedelta(minutes=minBetweenGames)
+        #         third_game_time_end = third_game_time_start+timedelta(minutes=minPerGame)
+
+        # print(f"gameDay_teamNum: {gameDay_teamNum}")
+        # print(f"gameDay_date: {gameDay_date}")
+        # print(f"gameDay_time: {gameDay_time}")
+        # print(f"No Gameday created at {league_id}")
         
-
-        # $query = "INSERT INTO tb_gameday (gd_id, gd_idLeague, gd_teamNum, gd_date, gd_status, gd_idWinner1, gd_nameWinner1, gd_idWinner2, gd_nameWinner2, gd_gameDayName) VALUES (NULL, '".$league_id."', '".$gameDay_teamNum."', '".$gameDay_date."', 'Por Jogar', NULL, NULL, NULL, NULL, NULL)";
-        db.session.execute(
-            text("INSERT INTO tb_gameday (gd_id, gd_idLeague, gd_teamNum, gd_date, gd_status, gd_idWinner1, gd_nameWinner1, gd_idWinner2, gd_nameWinner2, gd_gameDayName) VALUES (NULL, :league_id, :gameDay_teamNum, :gameDay_date, 'Por Jogar', NULL, NULL, NULL, NULL, NULL)"),
-            {"league_id": league_id, "gameDay_teamNum": gameDay_teamNum, "gameDay_date": gameDay_date}
-        )
-        db.session.commit()
-
+        # print("before write")
+        try:
+            db.session.execute(
+                text("INSERT INTO tb_gameday (gd_id, gd_idLeague, gd_teamNum, gd_date, gd_status, gd_idWinner1, gd_nameWinner1, gd_idWinner2, gd_nameWinner2, gd_gameDayName) VALUES (NULL, :league_id, :gameDay_teamNum, :gameDay_date, 'Por Jogar', NULL, NULL, NULL, NULL, NULL)"),
+                {"league_id": league_id, "gameDay_teamNum": gameDay_teamNum, "gameDay_date": gameDay_date}
+            )
+            db.session.commit()
+        except Exception as e:
+            print("Error: " + str(e))
+        # print(f"Gameday created at {league_id}")
+    
         #TODO - taking in consideration the start date and time and all the times in league we can create the placeholdes for the games if they don't exist yet
 
     except Exception as e:
         print("Error: " + str(e))
 
     league_data = League.query.filter_by(lg_id=leagueID).first()
-    result = GameDay.query.filter_by(gd_idLeague=leagueID).all()
+    result = GameDay.query.filter_by(gd_idLeague=leagueID).order_by(desc(GameDay.gd_date)).all()
     classification = LeagueClassification.query.filter_by(lc_idLeague=leagueID).order_by(desc(LeagueClassification.lc_ranking)).all()
     return render_template("managementLeague_detail.html", user=current_user, league=league_data, result=result, classification=classification)
 
@@ -1875,7 +1897,10 @@ def func_create_games_for_gameday(gameDayID):
     #CHECK IF IN tb_game there are already all the games necessary
     GameD = GameDay.query.filter_by(gd_id=gameDayID).first()
     league = League.query.filter_by(lg_id=GameD.gd_idLeague).first()
-    league_nbrTeams= league.lg_nbrTeams
+    if league.lg_id_tp != 6:
+        league_nbrTeams= league.lg_nbrTeams
+    else:
+        league_nbrTeams = GameD.gd_teamNum
     startTime = league.lg_startTime
     league_minWarmUp = league.lg_minWarmUp
     league_minPerGame = league.lg_minPerGame

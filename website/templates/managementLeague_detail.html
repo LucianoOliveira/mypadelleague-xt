@@ -3,7 +3,8 @@
 <!-- Show front page of league -->
 
 <!-- button to create new gameday -->
-{% if league.lg_typeOfLeague == 'Avulso' %}
+<!-- Criar novas jornadas só em ligas do tipo 6, ligas avulso -->
+{% if league.lg_id_tp == 6 %}
 <div class="container">
     <div class="row">
         <div class="col-md-12 text-right">
