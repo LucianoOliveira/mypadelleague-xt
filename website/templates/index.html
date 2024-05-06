@@ -32,7 +32,11 @@
                                     </div>
                                     <div class="card__address">
                                         <i class="zmdi zmdi-calendar"></i>
-                                        <div class="card__address__street">De {{ data['lg_startDate'] }} a {{ data['lg_endDate'] }}</div>
+                                        {% if data['lg_startDate'] %}
+                                            <div class="card__address__street">{{ data['lg_startDate'] }}</div>
+                                        {% else %}
+                                            <div class="card__address__street">Continuo</div>
+                                        {% endif %}
                                     </div>
                                     <div class="card__address">
                                         {% if data['lg_status'][4:]=="Ativo" %}
