@@ -57,6 +57,9 @@ def managementLeague():
 @views.route('/managementLeague_detail/<leagueID>', methods=['GET', 'POST'])
 @login_required
 def managementLeague_detail(leagueID):
+    # updates avulso
+    if 1 != 2:
+        updates_avulso()
     league_data = League.query.filter_by(lg_id=leagueID).first()
     result = GameDay.query.filter_by(gd_idLeague=leagueID).order_by(desc(GameDay.gd_date)).all()
     classification = LeagueClassification.query.filter_by(lc_idLeague=leagueID).order_by(desc(LeagueClassification.lc_ranking)).all()
@@ -1143,7 +1146,8 @@ def submitResultsGameDay(gameDayID):
         if ended_game_days_count == 0:
             # Update the league status to 'Terminado'
             league = League.query.get(league_id)
-            league.lg_status = '8 - Terminado'
+            if league.lg_id_tp !=6:
+                league.lg_status = '8 - Terminado'
             db.session.commit()
 
         calculateGameDayClassification(gameDayID)
@@ -2923,3 +2927,27 @@ def calculate_ELO_parcial():
         print("Error99:", e)
 
     #print("Print from end of ELO calc")
+
+
+def updates_avulso():
+    # Select every game if league as K higher than 0 and is not on ranking yet
+    try:
+        # delete gameday 39
+        gameDay_id = 39
+        db.session.execute(
+            text(f"DELETE FROM tb_gameDay WHERE gp_id=:gameDay_id"),
+            {"gameDay_id": gameDay_id}
+        )
+        db.session.commit()
+        # Ativar liga 14
+        league_id = 14
+        db.session.execute(
+            text(f"UPDATE tb_league set lg_status='7 - Ativo' WHERE lg_id=:league_id"),
+            {"league_id": league_id}
+        )
+        db.session.commit()
+
+
+    except Exception as e:
+        print("Error Avulso:", e)
+
