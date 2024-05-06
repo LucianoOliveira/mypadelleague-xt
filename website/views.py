@@ -52,7 +52,7 @@ def gameDay_detail(gameDayID):
 @login_required
 def managementLeague():
     # updates avulso
-    updates_avulso()
+    # updates_avulso()
 
     leagues_data = League.query.order_by(League.lg_status, League.lg_endDate.desc()).all()
     return render_template("managementLeague.html", user=current_user, result=leagues_data)
