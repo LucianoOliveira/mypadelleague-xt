@@ -58,8 +58,8 @@ def managementLeague():
 @login_required
 def managementLeague_detail(leagueID):
     # updates avulso
-    if 1 != 2:
-        updates_avulso()
+    updates_avulso()
+
     league_data = League.query.filter_by(lg_id=leagueID).first()
     result = GameDay.query.filter_by(gd_idLeague=leagueID).order_by(desc(GameDay.gd_date)).all()
     classification = LeagueClassification.query.filter_by(lc_idLeague=leagueID).order_by(desc(LeagueClassification.lc_ranking)).all()
@@ -2930,6 +2930,7 @@ def calculate_ELO_parcial():
 
 
 def updates_avulso():
+    print("inicio updates avulso")
     # Select every game if league as K higher than 0 and is not on ranking yet
     try:
         # delete gameday 39
@@ -2950,4 +2951,6 @@ def updates_avulso():
 
     except Exception as e:
         print("Error Avulso:", e)
+
+    print("fim updates avulso")
 
