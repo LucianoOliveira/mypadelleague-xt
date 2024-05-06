@@ -51,15 +51,15 @@ def gameDay_detail(gameDayID):
 @views.route('/managementLeague', methods=['GET', 'POST'])
 @login_required
 def managementLeague():
+    # updates avulso
+    updates_avulso()
+
     leagues_data = League.query.order_by(League.lg_status, League.lg_endDate.desc()).all()
     return render_template("managementLeague.html", user=current_user, result=leagues_data)
 
 @views.route('/managementLeague_detail/<leagueID>', methods=['GET', 'POST'])
 @login_required
 def managementLeague_detail(leagueID):
-    # updates avulso
-    updates_avulso()
-
     league_data = League.query.filter_by(lg_id=leagueID).first()
     result = GameDay.query.filter_by(gd_idLeague=leagueID).order_by(desc(GameDay.gd_date)).all()
     classification = LeagueClassification.query.filter_by(lc_idLeague=leagueID).order_by(desc(LeagueClassification.lc_ranking)).all()
@@ -2936,7 +2936,7 @@ def updates_avulso():
         # delete gameday 39
         gameDay_id = 39
         db.session.execute(
-            text(f"DELETE FROM tb_gameDay WHERE gp_id=:gameDay_id"),
+            text(f"DELETE FROM tb_gameDay WHERE gd_id=:gameDay_id"),
             {"gameDay_id": gameDay_id}
         )
         db.session.commit()
