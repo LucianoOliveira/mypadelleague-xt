@@ -2576,7 +2576,7 @@ def calculate_ELO_full():
     # Select every game if league as K higher than 0
     try:
         r1 = db.session.execute(
-            text(f"SELECT gm_id, gm_idPlayer_A1, gm_namePlayer_A1, gm_idPlayer_A2, gm_namePlayer_A2, gm_idPlayer_B1, gm_namePlayer_B1, gm_idPlayer_B2, gm_namePlayer_B2, gm_result_A, gm_result_B, gm_idLeague, gm_date, gm_timeStart, gm_idGameDay FROM tb_game WHERE gm_idLeague IN ( SELECT lg_id FROM tb_league WHERE lg_eloK > 0 AND lg_startDate >= :start_date ) AND gm_idPlayer_A1 IS NOT NULL ORDER BY gm_date ASC, gm_timeStart ASC"),
+            text(f"SELECT gm_id, gm_idPlayer_A1, gm_namePlayer_A1, gm_idPlayer_A2, gm_namePlayer_A2, gm_idPlayer_B1, gm_namePlayer_B1, gm_idPlayer_B2, gm_namePlayer_B2, gm_result_A, gm_result_B, gm_idLeague, gm_date, gm_timeStart, gm_idGameDay FROM tb_game WHERE gm_idLeague IN ( SELECT lg_id FROM tb_league WHERE lg_eloK > 0) AND gm_idPlayer_A1 IS NOT NULL ORDER BY gm_date ASC, gm_timeStart ASC"),
             {"start_date": datetime(2020, 1, 1)},
         ).fetchall()
         
@@ -2761,7 +2761,7 @@ def calculate_ELO_parcial():
     # Select every game if league as K higher than 0 and is not on ranking yet
     try:
         r1 = db.session.execute(
-            text(f"SELECT gm_id, gm_idPlayer_A1, gm_namePlayer_A1, gm_idPlayer_A2, gm_namePlayer_A2, gm_idPlayer_B1, gm_namePlayer_B1, gm_idPlayer_B2, gm_namePlayer_B2, gm_result_A, gm_result_B, gm_idLeague, gm_date, gm_timeStart, gm_idGameDay FROM tb_game WHERE gm_idLeague IN ( SELECT lg_id FROM tb_league WHERE lg_eloK > 0 AND lg_startDate >= :start_date ) AND gm_id not in (select el_gm_id from tb_ELO_ranking_hist GROUP BY el_gm_id) AND gm_idPlayer_A1 IS NOT NULL ORDER BY gm_date ASC, gm_timeStart ASC"),
+            text(f"SELECT gm_id, gm_idPlayer_A1, gm_namePlayer_A1, gm_idPlayer_A2, gm_namePlayer_A2, gm_idPlayer_B1, gm_namePlayer_B1, gm_idPlayer_B2, gm_namePlayer_B2, gm_result_A, gm_result_B, gm_idLeague, gm_date, gm_timeStart, gm_idGameDay FROM tb_game WHERE gm_idLeague IN ( SELECT lg_id FROM tb_league WHERE lg_eloK > 0) AND gm_id not in (select el_gm_id from tb_ELO_ranking_hist GROUP BY el_gm_id) AND gm_idPlayer_A1 IS NOT NULL ORDER BY gm_date ASC, gm_timeStart ASC"),
             {"start_date": datetime(2020, 1, 1)},
         ).fetchall()
         
