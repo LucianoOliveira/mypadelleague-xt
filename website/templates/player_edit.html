@@ -125,7 +125,7 @@
                         <h6 class="mb-0">Melhor parceiro</h6>
                     </div>
                     <div class="col-sm-9">
-                        {{ player.best_teammate_name }} - {{ player.best_teammate_win_percentage }}% Vitórias em {{ player.best_teammate_total_games }} Jogos.
+                        {{ display_short_name(player.best_teammate_name) }} - {{ player.best_teammate_win_percentage }}% Vitórias em {{ player.best_teammate_total_games }} Jogos.
                     </div>
                 </div>
                 <hr>
@@ -134,7 +134,7 @@
                         <h6 class="mb-0">Pior parceiro</h6>
                     </div>
                     <div class="col-sm-9">
-                        {{ player.worst_teammate_name }} - {{ player.worst_teammate_lost_percentage }}% Derrotas em {{ player.worst_teammate_total_games }} Jogos.
+                        {{ display_short_name(player.worst_teammate_name) }} - {{ player.worst_teammate_lost_percentage }}% Derrotas em {{ player.worst_teammate_total_games }} Jogos.
                     </div>
                 </div>
                 <hr>
@@ -143,7 +143,7 @@
                         <h6 class="mb-0">Pior adversário</h6>
                     </div>
                     <div class="col-sm-9">
-                        {{ player.worst_nightmare_name }} - {{ player.worst_nightmare_lost_percentage }}% Derrotas em {{ player.worst_nightmare_games }} Jogos.
+                        {{ display_short_name(player.worst_nightmare_name) }} - {{ player.worst_nightmare_lost_percentage }}% Derrotas em {{ player.worst_nightmare_games }} Jogos.
                     </div>
                 </div>
                 <hr>
@@ -152,7 +152,7 @@
                         <h6 class="mb-0">Melhor adversário</h6>
                     </div>
                     <div class="col-sm-9">
-                        {{ player.best_opponent_name }} - {{ player.best_opponent_victory_percentage }}% Vitórias em {{ player.best_opponent_games }} Jogos.
+                        {{ display_short_name(player.best_opponent_name) }} - {{ player.best_opponent_victory_percentage }}% Vitórias em {{ player.best_opponent_games }} Jogos.
                     </div>
                 </div>
             </div>
@@ -281,8 +281,8 @@
                       <img width="50" height="57" alt="" src="{{ photoA2 }}">
                     </div>
                     <div class="nombres">
-                      <div>{{ data.gm_namePlayer_A1 }}</div>
-                      <div>{{ data.gm_namePlayer_A2 }}</div>
+                      <div>{{ display_short_name(data.gm_namePlayer_A1) }}</div>
+                      <div>{{ display_short_name(data.gm_namePlayer_A2) }}</div>
                     </div>
                   </div>
                   <div class="marcador-wrapper">
@@ -298,8 +298,8 @@
                       <img width="50" height="57" alt="" src="{{ photoB2 }}">
                     </div>
                     <div class="nombres">
-                      <div>{{ data.gm_namePlayer_B1 }}</div>
-                      <div>{{ data.gm_namePlayer_B2 }}</div>
+                      <div>{{ display_short_name(data.gm_namePlayer_B1) }}</div>
+                      <div>{{ display_short_name(data.gm_namePlayer_B2) }}</div>
                     </div>
                   </div>
                   <div class="marcador-wrapper">

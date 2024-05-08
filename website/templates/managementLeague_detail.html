@@ -41,7 +41,7 @@
                     <br>Data : {{ data['gd_date'] }}</br>
                     <br>Estado : {{ data['gd_status'] }}</br>
                     {% if data['gd_status'] == 'Terminado' %}
-                        <br>Vencedores: {{ data['gd_nameWinner1'] }} / {{ data['gd_nameWinner2'] }}</br>
+                        <br>Vencedores: {{ display_short_name(data['gd_nameWinner1']) }} / {{ display_short_name(data['gd_nameWinner2']) }}</br>
                     {% else %}
                         <br>Vencedores: </br>
                     {% endif %}
@@ -80,7 +80,7 @@
                                 <!-- <th scope="row">{{ data['lc_idPlayer'] }}</th> -->
                                 <td class=""  onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['lc_idPlayer']) }}';">
                                     <img src="{{ url_for('views.display_user_image', userID=data['lc_idPlayer'] ) }}" alt="{{ data['lc_namePlayer'] }}" class="rounded-circle" width="40">
-                                    {{ data['lc_namePlayer'] }}
+                                    {{ display_short_name(data['lc_namePlayer']) }}
                                 </td>
                                 <td class="" onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['lc_idPlayer']) }}';">{{ data['lc_points'] }}</td>
                                 <td class="d-none d-md-table-cell" onclick="window.location.href='{{ url_for('views.player_detail', playerID=data['lc_idPlayer']) }}';">{{ data['lc_wins'] }}</td>
