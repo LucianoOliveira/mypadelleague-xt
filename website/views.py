@@ -286,6 +286,9 @@ def insert_game_day_players(gameDayID):
 
     if type_of_teams == 'ranking':
         num_rankings = LeagueClassification.query.filter_by(lc_idLeague=league_id).count()
+        print("num_rankings LeagueClassification:", num_rankings)
+        num_rankings = ELOranking.query.count()
+        print("num_rankings ELOranking:", num_rankings)
         if num_rankings == 0:
             type_of_teams = 'random'
 
@@ -301,8 +304,8 @@ def insert_game_day_players(gameDayID):
             player_ranking = 0
             try:
                 ranking_info = db.session.execute(
-                    text(f"SELECT lc_ranking FROM tb_leagueClassification WHERE lc_idLeague=:league_id and lc_idPlayer=:player_id"),
-                    {"league_id": league_id, "player_id": player_id}
+                    text(f"SELECT pl_rankingNow FROM tb_ELO_ranking WHERE pl_id=:player_id"),
+                    {"player_id": player_id}
                 ).fetchone()
                 if ranking_info:
                     player_ranking = ranking_info[0] * 100            
@@ -316,7 +319,7 @@ def insert_game_day_players(gameDayID):
                     # print("Reached here")
                     player_birthday = player.pl_birthday
                     player_age = calculate_player_age(player_birthday)
-                    player_ranking = player_age/100  
+                    player_ranking = int(player_age)/100  
                     # print(f"Reached here: player_age={player_age}, player_ranking={player_ranking}")              
 
             players_array.append({"id": player_id, "ranking": player_ranking})
@@ -335,67 +338,144 @@ def insert_game_day_players(gameDayID):
             print("Error DELETE tb_gameDayPlayer:", e)
 
         num_teams = num_players // 2
-        for j in range(num_teams):
-            team_name = chr(ord('A') + j)
+        # except for mexican it is done first/last
+        if league.lg_id_tp != 5:
+            for j in range(num_teams):
+                team_name = chr(ord('A') + j)
 
-            player1_result = players_array.pop(0)
-            player1_team_id = player1_result['id']
-            player1_team_name = Players.query.get(player1_team_id).pl_name
+                player1_result = players_array.pop(0)
+                player1_team_id = player1_result['id']
+                player1_team_name = Players.query.get(player1_team_id).pl_name
 
-            player2_result = players_array.pop()
-            player2_team_id = player2_result['id']
-            player2_team_name = Players.query.get(player2_team_id).pl_name
+                player2_result = players_array.pop()
+                player2_team_id = player2_result['id']
+                player2_team_name = Players.query.get(player2_team_id).pl_name
 
-            for player_id, player_name in [(player1_team_id, player1_team_name), (player2_team_id, player2_team_name)]:
-                try:
-                    game_day_player = GameDayPlayer(
-                        gp_idLeague=league_id,
-                        gp_idGameDay=gameDay_id,
-                        gp_idPlayer=player_id,
-                        gp_namePlayer=player_name,
-                        gp_team=team_name
+                for player_id, player_name in [(player1_team_id, player1_team_name), (player2_team_id, player2_team_name)]:
+                    try:
+                        game_day_player = GameDayPlayer(
+                            gp_idLeague=league_id,
+                            gp_idGameDay=gameDay_id,
+                            gp_idPlayer=player_id,
+                            gp_namePlayer=player_name,
+                            gp_team=team_name
+                        )
+                        db.session.add(game_day_player)
+                        db.session.commit()
+                    except Exception as e:
+                        print("Error:", e)
+
+
+                # go through all the teams in GameDayPlayer
+                gd_players = GameDayPlayer.query.filter_by(gp_idGameDay=gameDay_id).order_by(GameDayPlayer.gp_team.asc(), GameDayPlayer.gp_id.asc()).all()
+        
+                # Organize players by team
+                teams = {}
+                for gd_player in gd_players:
+                    if gd_player.gp_team not in teams:
+                        teams[gd_player.gp_team] = []
+                    teams[gd_player.gp_team].append(gd_player)
+
+                
+                for team, players in teams.items():
+                    player1ID=0
+                    player1Name=''
+                    player2ID=0
+                    player2Name=''
+                    for player in players:
+                        if player1ID==0:
+                            player1ID = player.gp_idPlayer
+                            player1Name = player.gp_namePlayer
+                        else:
+                            player2ID = player.gp_idPlayer
+                            player2Name = player.gp_namePlayer
+
+                    #print(f"Reached here: {player1ID}, {player1Name}, {player2ID}, {player2Name}, {gameDay_id}, {team}, ")
+                    db.session.execute(
+                    text(f"update tb_game set gm_idPlayer_A1=:player1ID, gm_namePlayer_A1=:player1Name, gm_idPlayer_A2=:player2ID, gm_namePlayer_A2=:player2Name where gm_idGameDay=:gameDay_id and gm_teamA=:team"),
+                        {"player1ID": player1ID, "player1Name": player1Name, "player2ID": player2ID, "player2Name": player2Name, "gameDay_id": gameDay_id, "team": team}
                     )
-                    db.session.add(game_day_player)
                     db.session.commit()
-                except Exception as e:
-                    print("Error:", e)
+                    db.session.execute(
+                    text(f"update tb_game set gm_idPlayer_B1=:player1ID, gm_namePlayer_B1=:player1Name, gm_idPlayer_B2=:player2ID, gm_namePlayer_B2=:player2Name where gm_idGameDay=:gameDay_id and gm_teamB=:team"),
+                        {"player1ID": player1ID, "player1Name": player1Name, "player2ID": player2ID, "player2Name": player2Name, "gameDay_id": gameDay_id, "team": team}
+                    )
+                    db.session.commit()
+        # This else if for the mexican type of gameday            
+        else:
+            first_or_second = 'first'
+            for j in range(num_teams):
+                team_name = chr(ord('A') + j)
+
+                if first_or_second == 'first':
+                    player1_result = players_array.pop(0)
+                    player1_team_id = player1_result['id']
+                    player1_team_name = Players.query.get(player1_team_id).pl_name
+
+                    player2_result = players_array.pop(2)
+                    player2_team_id = player2_result['id']
+                    player2_team_name = Players.query.get(player2_team_id).pl_name
+                    first_or_second = 'second'
+                else:
+                    player1_result = players_array.pop(0)
+                    player1_team_id = player1_result['id']
+                    player1_team_name = Players.query.get(player1_team_id).pl_name
+
+                    player2_result = players_array.pop(0)
+                    player2_team_id = player2_result['id']
+                    player2_team_name = Players.query.get(player2_team_id).pl_name
+                    first_or_second = 'first'
+
+                for player_id, player_name in [(player1_team_id, player1_team_name), (player2_team_id, player2_team_name)]:
+                    try:
+                        game_day_player = GameDayPlayer(
+                            gp_idLeague=league_id,
+                            gp_idGameDay=gameDay_id,
+                            gp_idPlayer=player_id,
+                            gp_namePlayer=player_name,
+                            gp_team=team_name
+                        )
+                        db.session.add(game_day_player)
+                        db.session.commit()
+                    except Exception as e:
+                        print("Error:", e)
 
 
-            # go through all the teams in GameDayPlayer
-            gd_players = GameDayPlayer.query.filter_by(gp_idGameDay=gameDay_id).order_by(GameDayPlayer.gp_team.asc(), GameDayPlayer.gp_id.asc()).all()
-    
-            # Organize players by team
-            teams = {}
-            for gd_player in gd_players:
-                if gd_player.gp_team not in teams:
-                    teams[gd_player.gp_team] = []
-                teams[gd_player.gp_team].append(gd_player)
+                # go through all the teams in GameDayPlayer
+                gd_players = GameDayPlayer.query.filter_by(gp_idGameDay=gameDay_id).order_by(GameDayPlayer.gp_team.asc(), GameDayPlayer.gp_id.asc()).all()
+        
+                # Organize players by team
+                teams = {}
+                for gd_player in gd_players:
+                    if gd_player.gp_team not in teams:
+                        teams[gd_player.gp_team] = []
+                    teams[gd_player.gp_team].append(gd_player)
 
-            
-            for team, players in teams.items():
-                player1ID=0
-                player1Name=''
-                player2ID=0
-                player2Name=''
-                for player in players:
-                    if player1ID==0:
-                        player1ID = player.gp_idPlayer
-                        player1Name = player.gp_namePlayer
-                    else:
-                        player2ID = player.gp_idPlayer
-                        player2Name = player.gp_namePlayer
+                
+                for team, players in teams.items():
+                    player1ID=0
+                    player1Name=''
+                    player2ID=0
+                    player2Name=''
+                    for player in players:
+                        if player1ID==0:
+                            player1ID = player.gp_idPlayer
+                            player1Name = player.gp_namePlayer
+                        else:
+                            player2ID = player.gp_idPlayer
+                            player2Name = player.gp_namePlayer
 
-                #print(f"Reached here: {player1ID}, {player1Name}, {player2ID}, {player2Name}, {gameDay_id}, {team}, ")
-                db.session.execute(
-                text(f"update tb_game set gm_idPlayer_A1=:player1ID, gm_namePlayer_A1=:player1Name, gm_idPlayer_A2=:player2ID, gm_namePlayer_A2=:player2Name where gm_idGameDay=:gameDay_id and gm_teamA=:team"),
-                    {"player1ID": player1ID, "player1Name": player1Name, "player2ID": player2ID, "player2Name": player2Name, "gameDay_id": gameDay_id, "team": team}
-                )
-                db.session.commit()
-                db.session.execute(
-                text(f"update tb_game set gm_idPlayer_B1=:player1ID, gm_namePlayer_B1=:player1Name, gm_idPlayer_B2=:player2ID, gm_namePlayer_B2=:player2Name where gm_idGameDay=:gameDay_id and gm_teamB=:team"),
-                    {"player1ID": player1ID, "player1Name": player1Name, "player2ID": player2ID, "player2Name": player2Name, "gameDay_id": gameDay_id, "team": team}
-                )
-                db.session.commit()
+                    #print(f"Reached here: {player1ID}, {player1Name}, {player2ID}, {player2Name}, {gameDay_id}, {team}, ")
+                    db.session.execute(
+                    text(f"update tb_game set gm_idPlayer_A1=:player1ID, gm_namePlayer_A1=:player1Name, gm_idPlayer_A2=:player2ID, gm_namePlayer_A2=:player2Name where gm_idGameDay=:gameDay_id and gm_teamA=:team"),
+                        {"player1ID": player1ID, "player1Name": player1Name, "player2ID": player2ID, "player2Name": player2Name, "gameDay_id": gameDay_id, "team": team}
+                    )
+                    db.session.commit()
+                    db.session.execute(
+                    text(f"update tb_game set gm_idPlayer_B1=:player1ID, gm_namePlayer_B1=:player1Name, gm_idPlayer_B2=:player2ID, gm_namePlayer_B2=:player2Name where gm_idGameDay=:gameDay_id and gm_teamB=:team"),
+                        {"player1ID": player1ID, "player1Name": player1Name, "player2ID": player2ID, "player2Name": player2Name, "gameDay_id": gameDay_id, "team": team}
+                    )
+                    db.session.commit()
 
     # FOR RANDOM*******************************************************************************                
     elif type_of_teams == 'random':
@@ -1119,6 +1199,7 @@ def display_league_image_small(leagueID):
 def submitResultsGameDay(gameDayID):
     gameDay_data = GameDay.query.filter_by(gd_id=gameDayID).first()
     league_id = gameDay_data.gd_idLeague
+    leagueObject = League.query.filter_by(lg_id=league_id).first()
     #Get all ids of that gameday
     result = Game.query.filter_by(gm_idGameDay=gameDayID).all()
     if result:
@@ -1143,16 +1224,24 @@ def submitResultsGameDay(gameDayID):
         #If all gamedays of that league are Terminado  change status of League to Terminado
         ended_game_days_count = GameDay.query.filter_by(gd_idLeague=league_id, gd_status='Por Jogar').count()
 
-        if ended_game_days_count == 0:
-            # Update the league status to 'Terminado'
-            league = League.query.get(league_id)
-            if league.lg_id_tp !=6:
-                league.lg_status = '8 - Terminado'
-            db.session.commit()
+        # Apenas se não for mexicano
+        type_of_league = leagueObject.lg_id_tp
+        if type_of_league != 5:
+            if ended_game_days_count == 0:
+                # Update the league status to 'Terminado'
+                league = League.query.get(league_id)
+                if league.lg_id_tp !=6:
+                    league.lg_status = '8 - Terminado'
+                db.session.commit()
 
         calculateGameDayClassification(gameDayID)
         calculateLeagueClassification(league_id)
         calculate_ELO_parcial()
+
+        # If it is a mexican then we need to create one more round based on the gameday classification.
+        if type_of_league == 5:
+            #Create one more round
+            createMexicanRound(gameDayID)
 
     return redirect(url_for('views.managementGameDay_detail', gameDayID=gameDayID)) 
 
@@ -1178,9 +1267,21 @@ def insertLeague():
             lg_minPerGame = 25
             lg_minBetweenGames = 5
             lg_eloK = 40
+            lg_id_tp = 1
             db.session.execute(
-                text("INSERT INTO tb_league (lg_name, lg_level, lg_status, lg_nbrDays, lg_nbrTeams, lg_startDate, lg_endDate, lg_startTime, lg_typeOfLeague, lg_minWarmUp, lg_minPerGame, lg_minBetweenGames, lg_eloK) VALUES (:league_name, :league_level, :league_status, :league_numGameDays, :league_numTeams, :league_dateStart, :league_dateEnd, :league_timeStart, :league_type, :lg_minWarmUp, :lg_minPerGame, :lg_minBetweenGames, :lg_eloK)"),
-                {"league_name": league_name, "league_level": league_level, "league_status": league_status, "league_numGameDays": league_numGameDays, "league_numTeams": league_numTeams, "league_dateStart": league_dateStart, "league_dateEnd": league_dateEnd, "league_timeStart": league_timeStart, "league_type": league_type, "lg_minWarmUp": lg_minWarmUp, "lg_minPerGame": lg_minPerGame, "lg_minBetweenGames": lg_minBetweenGames, "lg_eloK": lg_eloK}
+                text("INSERT INTO tb_league (lg_name, lg_level, lg_status, lg_nbrDays, lg_nbrTeams, lg_startDate, lg_endDate, lg_startTime, lg_typeOfLeague, lg_minWarmUp, lg_minPerGame, lg_minBetweenGames, lg_eloK, lg_id_tp) VALUES (:league_name, :league_level, :league_status, :league_numGameDays, :league_numTeams, :league_dateStart, :league_dateEnd, :league_timeStart, :league_type, :lg_minWarmUp, :lg_minPerGame, :lg_minBetweenGames, :lg_eloK, :lg_id_tp)"),
+                {"league_name": league_name, "league_level": league_level, "league_status": league_status, "league_numGameDays": league_numGameDays, "league_numTeams": league_numTeams, "league_dateStart": league_dateStart, "league_dateEnd": league_dateEnd, "league_timeStart": league_timeStart, "league_type": league_type, "lg_minWarmUp": lg_minWarmUp, "lg_minPerGame": lg_minPerGame, "lg_minBetweenGames": lg_minBetweenGames, "lg_eloK": lg_eloK, "lg_id_tp": lg_id_tp}
+            )
+            db.session.commit()
+        elif league_type == 'Mexicano':
+            lg_minWarmUp = 5
+            lg_minPerGame = 25
+            lg_minBetweenGames = 5
+            lg_eloK = int(league_numTeams) * 10
+            lg_id_tp = 5
+            db.session.execute(
+                text("INSERT INTO tb_league (lg_name, lg_level, lg_status, lg_nbrDays, lg_nbrTeams, lg_startDate, lg_endDate, lg_startTime, lg_typeOfLeague, lg_minWarmUp, lg_minPerGame, lg_minBetweenGames, lg_eloK, lg_id_tp) VALUES (:league_name, :league_level, :league_status, :league_numGameDays, :league_numTeams, :league_dateStart, :league_dateEnd, :league_timeStart, :league_type, :lg_minWarmUp, :lg_minPerGame, :lg_minBetweenGames, :lg_eloK, :lg_id_tp)"),
+                {"league_name": league_name, "league_level": league_level, "league_status": league_status, "league_numGameDays": league_numGameDays, "league_numTeams": league_numTeams, "league_dateStart": league_dateStart, "league_dateEnd": league_dateEnd, "league_timeStart": league_timeStart, "league_type": league_type, "lg_minWarmUp": lg_minWarmUp, "lg_minPerGame": lg_minPerGame, "lg_minBetweenGames": lg_minBetweenGames, "lg_eloK": lg_eloK, "lg_id_tp": lg_id_tp}
             )
             db.session.commit()
         else:
@@ -1190,9 +1291,10 @@ def insertLeague():
             lg_minPerGame = 25
             lg_minBetweenGames = 5
             lg_eloK = 0
+            lg_id_tp = 6
             db.session.execute(
-                text("INSERT INTO tb_league (lg_name, lg_level, lg_status, lg_nbrDays, lg_nbrTeams, lg_startDate, lg_endDate, lg_typeOfLeague, lg_minWarmUp, lg_minPerGame, lg_minBetweenGames, lg_eloK) VALUES (:league_name, :league_level, :league_status, :league_numGameDays, :league_numTeams, :league_dateStart, :league_dateEnd, :league_type, :lg_minWarmUp, :lg_minPerGame, :lg_minBetweenGames, :lg_eloK)"),
-                {"league_name": league_name, "league_level": league_level, "league_status": league_status, "league_numGameDays": league_numGameDays, "league_numTeams": league_numTeams, "league_dateStart": league_dateStart, "league_dateEnd": league_dateEnd, "league_type": league_type, "lg_minWarmUp": lg_minWarmUp, "lg_minPerGame": lg_minPerGame, "lg_minBetweenGames": lg_minBetweenGames, "lg_eloK": lg_eloK}
+                text("INSERT INTO tb_league (lg_name, lg_level, lg_status, lg_nbrDays, lg_nbrTeams, lg_startDate, lg_endDate, lg_typeOfLeague, lg_minWarmUp, lg_minPerGame, lg_minBetweenGames, lg_eloK) VALUES (:league_name, :league_level, :league_status, :league_numGameDays, :league_numTeams, :league_dateStart, :league_dateEnd, :league_type, :lg_minWarmUp, :lg_minPerGame, :lg_minBetweenGames, :lg_eloK, :lg_id_tp)"),
+                {"league_name": league_name, "league_level": league_level, "league_status": league_status, "league_numGameDays": league_numGameDays, "league_numTeams": league_numTeams, "league_dateStart": league_dateStart, "league_dateEnd": league_dateEnd, "league_type": league_type, "lg_minWarmUp": lg_minWarmUp, "lg_minPerGame": lg_minPerGame, "lg_minBetweenGames": lg_minBetweenGames, "lg_eloK": lg_eloK, "lg_id_tp": lg_id_tp}
             )
             db.session.commit()
     except Exception as e:
@@ -1209,7 +1311,7 @@ def insertLeague():
         if leagueInfo:
             #print(playerInfo)
             league_id = leagueInfo[0]
-            if league_type == 'Liga':
+            if league_type == 'Liga' or league_type == 'Mexicano':
                 gameDayInfo = db.session.execute(
                     text(f"SELECT COUNT(*) AS NUMGAMEDAYS FROM tb_gameday WHERE gd_idLeague=:league_id"),
                     {"league_id": league_id}
@@ -1912,22 +2014,34 @@ def func_create_games_for_gameday(gameDayID):
     leagueId = league.lg_id
     gameDay_Day = GameD.gd_date
 
-    if league_nbrTeams == 2:
-        necessary_games = 1
-    elif league_nbrTeams == 3:
-        necessary_games = 3
-    elif league_nbrTeams == 4:
-        necessary_games = 6
-    elif league_nbrTeams == 5:
-        necessary_games = 10
-    elif league_nbrTeams == 6:
-        necessary_games = 15
-    elif league_nbrTeams == 7:
-        necessary_games = 21
-    elif league_nbrTeams == 8:
-        necessary_games = 28
+    # for every league except mexican
+    if league.lg_id_tp != 5:
+        if league_nbrTeams == 2:
+            necessary_games = 1
+        elif league_nbrTeams == 3:
+            necessary_games = 3
+        elif league_nbrTeams == 4:
+            necessary_games = 6
+        elif league_nbrTeams == 5:
+            necessary_games = 10
+        elif league_nbrTeams == 6:
+            necessary_games = 15
+        elif league_nbrTeams == 7:
+            necessary_games = 21
+        elif league_nbrTeams == 8:
+            necessary_games = 28
+        else:
+            necessary_games = 0
+    # mexican league we only create the first round
     else:
-        necessary_games = 0
+        if league_nbrTeams == 4:
+            necessary_games = 2
+        elif league_nbrTeams == 6:
+            necessary_games = 3
+        elif league_nbrTeams == 8:
+            necessary_games = 4
+        else:
+            necessary_games = 0
 
     # $gameStart = date('H:i:s', strtotime("+".$league_minWarmUp." minutes", strtotime($startTime)));
     # $gameEnd = date('H:i:s', strtotime("+".$league_minPerGame." minutes", strtotime($gameStart)));
@@ -1955,575 +2069,635 @@ def func_create_games_for_gameday(gameDayID):
 
     # if there aren't any games or if they were deleted in the last step create all the necessary games
     if num_games == 0:
-        if league_nbrTeams == 2:
-            necessary_games = 1
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-        
-        elif league_nbrTeams == 3:
-            necessary_games = 3
-            # Game 1
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 2
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'B', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 3
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'C', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-        
-        elif league_nbrTeams == 4:
-            necessary_games = 6
-            # Game 1 and 2
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'C', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 3 and 4
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'B', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 5 and 6
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'B', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
+        # if mexican only create first round
+        if league.lg_id_tp == 5:
+            if league_nbrTeams == 4:
+                necessary_games = 2
+                # Game 1 and 2
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'A', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'C', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+            elif league_nbrTeams == 6:
+                necessary_games = 3
+                # Game 1, 2 and 3
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'A', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'C', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'E', 'F')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
 
-        elif league_nbrTeams == 5:
-            necessary_games = 10
-            # Game 1 and 2
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'B', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 3 and 4
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'C', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'D', 'E')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 5 and 6
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'E', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'A', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 7 and 8
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'B', 'E')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'C', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 9 and 10
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'D', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'E', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-        
-        elif league_nbrTeams == 6:
-            necessary_games = 15
-            # Game 1, 2 and 3 ROUND 1
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'B', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'C', 'F')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'D', 'E')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 4, 5 and 6 ROUND 2
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'C', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'F', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'B', 'E')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 7, 8 and 9 ROUND 3
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'F', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'B', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'A', 'E')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 10, 11 and 12 ROUND 4
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'D', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'E', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'F', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 13, 14 and 15 ROUND 5
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'E', 'F')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'A', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'D', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            
-        elif league_nbrTeams == 7:
-            necessary_games = 21
-            # Game 1, 2 and 3 ROUND 1
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'F')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'B', 'E')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'C', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 4, 5 and 6 ROUND 2
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'D', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'E', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'F', 'G')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 7, 8 and 9 ROUND 3
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'B', 'G')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'C', 'F')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'D', 'E')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 10, 11 and 12 ROUND 4
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'E', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'F', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'G', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # Game 13, 14 and 15 ROUND 5
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'C', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'D', 'G')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'E', 'F')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # ROUND 6
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'F', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'G', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'A', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # ROUND 7
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'G', 'E')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'A', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'B', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-
-        elif league_nbrTeams == 8:
-            necessary_games = 28
-            # ROUND 1
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'B', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'C', 'H')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'D', 'G')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'E', 'F')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # ROUND 2
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'C', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'A', 'G')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'H', 'F')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'B', 'E')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # ROUND 3
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'F', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'G', 'H')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'D', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'E', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # ROUND 4
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'G', 'E')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'H', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'B', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'F', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # ROUND 5
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'D', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'E', 'H')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'F', 'G')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # ROUND 6
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'D', 'E')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'H', 'A')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'B', 'G')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'C', 'F')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            # ROUND 7
-            gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
-            gameEnd = gameStart + timedelta(minutes=league_minPerGame)
-            gameStart_str = gameStart.strftime("%H:%M:%S")
-            gameEnd_str = gameEnd.strftime("%H:%M:%S")  
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'G', 'C')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'H', 'B')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'A', 'E')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            db.session.execute(
-                text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'F', 'D')"),
-                {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
-            )
-            db.session.commit()
-            
+            elif league_nbrTeams == 8:
+                necessary_games = 4
+                # Game 1, 2, 3 and 4
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Spider', 0, 0, 'A', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'C', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'E', 'F')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'G', 'H')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                
+        # Not mexican
         else:
-            necessary_games = 0
+            if league_nbrTeams == 2:
+                necessary_games = 1
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+            
+            elif league_nbrTeams == 3:
+                necessary_games = 3
+                # Game 1
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 2
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'B', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 3
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'C', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+            
+            elif league_nbrTeams == 4:
+                necessary_games = 6
+                # Game 1 and 2
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'C', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 3 and 4
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'B', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 5 and 6
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'B', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+
+            elif league_nbrTeams == 5:
+                necessary_games = 10
+                # Game 1 and 2
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'B', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 3 and 4
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'C', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'D', 'E')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 5 and 6
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'E', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'A', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 7 and 8
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'B', 'E')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'C', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 9 and 10
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'D', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'E', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+            
+            elif league_nbrTeams == 6:
+                necessary_games = 15
+                # Game 1, 2 and 3 ROUND 1
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'B', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'C', 'F')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'D', 'E')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 4, 5 and 6 ROUND 2
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'C', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'F', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'B', 'E')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 7, 8 and 9 ROUND 3
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'F', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'B', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'A', 'E')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 10, 11 and 12 ROUND 4
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'D', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'E', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'F', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 13, 14 and 15 ROUND 5
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'E', 'F')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'A', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'D', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                
+            elif league_nbrTeams == 7:
+                necessary_games = 21
+                # Game 1, 2 and 3 ROUND 1
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'F')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'B', 'E')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'C', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 4, 5 and 6 ROUND 2
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'D', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'E', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'F', 'G')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 7, 8 and 9 ROUND 3
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'B', 'G')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'C', 'F')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'D', 'E')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 10, 11 and 12 ROUND 4
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'E', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'F', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'G', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # Game 13, 14 and 15 ROUND 5
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'C', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'D', 'G')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'E', 'F')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # ROUND 6
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'F', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'G', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'A', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # ROUND 7
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'G', 'E')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'A', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'B', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+
+            elif league_nbrTeams == 8:
+                necessary_games = 28
+                # ROUND 1
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'B', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'C', 'H')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'D', 'G')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'E', 'F')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # ROUND 2
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'C', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'A', 'G')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'H', 'F')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'B', 'E')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # ROUND 3
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'F', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'G', 'H')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'D', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'E', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # ROUND 4
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'G', 'E')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'H', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'B', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'F', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # ROUND 5
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'A', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'D', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'E', 'H')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'F', 'G')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # ROUND 6
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'D', 'E')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'H', 'A')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'B', 'G')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'C', 'F')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                # ROUND 7
+                gameStart = gameEnd + timedelta(minutes=league_minBetweenGames)
+                gameEnd = gameStart + timedelta(minutes=league_minPerGame)
+                gameStart_str = gameStart.strftime("%H:%M:%S")
+                gameEnd_str = gameEnd.strftime("%H:%M:%S")  
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 1', 0, 0, 'G', 'C')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 2', 0, 0, 'H', 'B')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 3', 0, 0, 'A', 'E')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                db.session.execute(
+                    text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, 'Campo 4', 0, 0, 'F', 'D')"),
+                    {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": gameDay_Day_str, "gameStart": gameStart_str, "gameEnd": gameEnd_str}
+                )
+                db.session.commit()
+                
+            else:
+                necessary_games = 0
 
 def calculate_ELO_full():
     #print("Print from beggining of ELO calc")
@@ -2954,3 +3128,78 @@ def updates_avulso():
 
     print("fim updates avulso")
 
+def createMexicanRound(gameDayID):
+    gameDay = GameDay.query.filter_by(gd_id=gameDayID).first()
+    leagueData = League.query.filter_by(lg_id=gameDay.gd_idLeague).first()
+    num_teams = leagueData.lg_nbrTeams
+    # num_players = int(gameDay.gd_teamNum)*2
+    players_array = []
+
+    ranking_info = db.session.execute(
+                    text(f"SELECT gc_idPlayer, gc_ranking FROM tb_gameDayClassification WHERE gc_idGameDay=:gameDayID ORDER BY gc_ranking DESC"),
+                    {"gameDayID": gameDayID}
+                ).fetchall()
+    for row in ranking_info:
+        gc_idPlayer, gc_ranking = row
+        players_array.append({'id': gc_idPlayer, 'ranking': gc_ranking})
+
+    players_array.sort(key=lambda x: x["ranking"], reverse=True)
+
+    if num_teams == 4:
+        courts = ["Campo 3", "Campo 4"]
+    elif num_teams == 6:
+        courts = ["Campo 3", "Campo 4", "Campo 2"]
+    elif num_teams == 8:
+        courts = ["Spider", "Campo 2", "Campo 3", "Campo 4"]
+
+    j = 0
+    x = 0
+    while len(players_array) >= 4:
+        # Team A
+        team_nameA = chr(ord('A') + j)
+        j = j + 1
+        playerA1_result = players_array.pop(0)
+        playerA1_team_id = playerA1_result['id']
+        playerA1_team_name = Players.query.get(playerA1_team_id).pl_name
+
+        playerA2_result = players_array.pop(2)
+        playerA2_team_id = playerA2_result['id']
+        playerA2_team_name = Players.query.get(playerA2_team_id).pl_name
+
+        # Team B
+        team_nameB = chr(ord('A') + j)
+        j = j + 1
+        playerB1_result = players_array.pop(0)
+        playerB1_team_id = playerB1_result['id']
+        playerB1_team_name = Players.query.get(playerB1_team_id).pl_name
+
+        playerB2_result = players_array.pop(0)
+        playerB2_team_id = playerB2_result['id']
+        playerB2_team_name = Players.query.get(playerB2_team_id).pl_name
+
+        # SELECT TIME(DATETIME(gm_timeEnd, '+1 second')) AS gm_time_next_Start FROM tb_game WHERE gm_idGameDay = 40 ORDER BY gm_timeEnd DESC LIMIT 1;
+        next_timeStart_row = db.session.execute(
+            text(f"SELECT TIME(DATETIME(gm_timeEnd, '+1 second')) AS gm_time_next_Start FROM tb_game WHERE gm_idGameDay =:gameDayID ORDER BY gm_timeEnd DESC LIMIT 1"),
+            {"gameDayID": gameDayID}
+        ).fetchone()
+        next_timeStart = next_timeStart_row[0] if next_timeStart_row else None
+        next_timeEnd_row = db.session.execute(
+            text(f"SELECT TIME(DATETIME(gm_timeEnd, '+1200 second')) AS gm_time_next_End FROM tb_game WHERE gm_idGameDay =:gameDayID ORDER BY gm_timeEnd DESC LIMIT 1"),
+            {"gameDayID": gameDayID}
+        ).fetchone()
+        next_timeEnd = next_timeEnd_row[0] if next_timeEnd_row else None
+        next_gamedayDay_row = db.session.execute(
+            text(f"SELECT gm_date FROM tb_game WHERE gm_idGameDay =:gameDayID ORDER BY gm_timeEnd DESC LIMIT 1"),
+            {"gameDayID": gameDayID}
+        ).fetchone()
+        next_gamedayDay = next_gamedayDay_row[0] if next_gamedayDay_row else None
+        leagueId = gameDay.gd_idLeague
+        nextCourt = courts[x]
+        x = x + 1
+
+        # Create the game
+        db.session.execute(
+            text(f"INSERT INTO tb_game (gm_idLeague, gm_idGameDay, gm_date, gm_timeStart, gm_timeEnd, gm_court, gm_idPlayer_A1, gm_namePlayer_A1, gm_idPlayer_A2, gm_namePlayer_A2, gm_idPlayer_B1, gm_namePlayer_B1, gm_idPlayer_B2, gm_namePlayer_B2, gm_result_A, gm_result_B, gm_teamA, gm_teamB) VALUES (:league_id, :gameDay_id, :gameday_day, :gameStart, :gameEnd, :court, :gm_idPlayer_A1, :gm_namePlayer_A1, :gm_idPlayer_A2, :gm_namePlayer_A2, :gm_idPlayer_B1, :gm_namePlayer_B1, :gm_idPlayer_B2, :gm_namePlayer_B2, 0, 0, :teamA, :teamB)"),
+            {"league_id": leagueId, "gameDay_id": gameDayID, "gameday_day": next_gamedayDay, "gameStart": next_timeStart, "gameEnd": next_timeEnd, "court": nextCourt, "gm_idPlayer_A1" : playerA1_team_id, "gm_namePlayer_A1" : playerA1_team_name, "gm_idPlayer_A2" : playerA2_team_id, "gm_namePlayer_A2" : playerA2_team_name, "gm_idPlayer_B1" : playerB1_team_id, "gm_namePlayer_B1" : playerB1_team_name, "gm_idPlayer_B2" : playerB2_team_id, "gm_namePlayer_B2" : playerB2_team_name, "teamA": team_nameA, "teamB": team_nameB}
+        )
+        db.session.commit()
