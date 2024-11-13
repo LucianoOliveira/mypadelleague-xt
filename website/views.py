@@ -1465,9 +1465,13 @@ def insertPlayer():
     if player_id == 0:
         # Insert into players
         try:
+            # db.session.execute(
+            #     text(f"INSERT INTO tb_players (pl_name, pl_email, pl_birthday, pl_ranking_stat) VALUES (:player_name, :player_email, :player_dob, :playerCat, 'Y')"),
+            #     {"player_name": playerName, "player_email": playerEmail, "player_dob": playerDOB, "playerCat": playerCat}
+            # )
             db.session.execute(
-                text(f"INSERT INTO tb_players (pl_name, pl_email, pl_birthday, pl_ranking_stat) VALUES (:player_name, :player_email, :player_dob, :playerCat, 'Y')"),
-                {"player_name": playerName, "player_email": playerEmail, "player_dob": playerDOB, "playerCat": playerCat}
+                text(f"INSERT INTO tb_players (pl_name, pl_email, pl_birthday, pl_ranking_stat) VALUES (:player_name, :player_email, :player_dob, 'Y')"),
+                {"player_name": playerName, "player_email": playerEmail, "player_dob": playerDOB}
             )
             db.session.commit()
         except Exception as e:
