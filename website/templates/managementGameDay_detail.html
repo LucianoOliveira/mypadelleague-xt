@@ -208,7 +208,11 @@
                 <div class="">
                   <div class="marcador" style="color: rgb(255, 255, 255);">
                     <div class="form-group">
+                      {% if type_gameday == 5 %}
+                        <input type="number" style="width: 4em" class="form-control form-control-rounded" id="resultGameA{{ data['gm_id'] }}" placeholder="{{ data['gm_result_A'] }}" value="{{ data['gm_result_A'] }}" name="resultGameA{{ data['gm_id'] }}">
+                      {% else %}
                       <input type="number" style="width: 4em" class="form-control form-control-rounded" id="resultGameA{{ data['gm_id'] }}" placeholder="{{ data['gm_result_A'] }}" name="resultGameA{{ data['gm_id'] }}">
+                      {% endif %}
                     </div>
                   </div>
                 </div>
@@ -227,7 +231,11 @@
                 <div class="">
                   <div class="marcador" style="color: rgb(255, 255, 255);">
                     <div class="form-group">
-                      <input type="number" style="width: 4em" class="form-control form-control-rounded" id="resultGameB{{ data['gm_id'] }}" placeholder="{{ data['gm_result_B'] }}" name="resultGameB{{ data['gm_id'] }}">
+                      {% if type_gameday == 5 %}
+                        <input type="number" style="width: 4em" class="form-control form-control-rounded" id="resultGameB{{ data['gm_id'] }}" placeholder="{{ data['gm_result_B'] }}" value="{{ data['gm_result_B'] }}" name="resultGameB{{ data['gm_id'] }}">
+                      {% else %}
+                        <input type="number" style="width: 4em" class="form-control form-control-rounded" id="resultGameB{{ data['gm_id'] }}" placeholder="{{ data['gm_result_B'] }}" name="resultGameB{{ data['gm_id'] }}">
+                      {% endif %}
                     </div>
                   </div>
                 </div>
@@ -244,6 +252,14 @@
     {% endif %}
   </div>
   </form>
+
+{% if type_gameday == 5 %}
+<form action="{{ url_for('views.endMexican', gameDayID=gameDay.gd_id) }}" method="post"></form>
+  <div class="form-group">
+    <button type="submit" class="btn btn-light btn-round px-5"><i class="icon-save"></i> Terminar Mexicano</button>
+  </div>
+</form>
+{% endif %}
 
 
   <!-- Second Row -->
