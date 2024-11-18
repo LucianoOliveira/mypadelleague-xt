@@ -165,6 +165,7 @@ def managementGameDay_detail(gameDayID):
         number_of_teams_league = gameDay_data.gd_teamNum
     players_data = Players.query.order_by(Players.pl_name).all()
     league_id = league.lg_id
+    type_gameday = league.lg_id_tp
     gameDay_id = gameDayID
     playersGameDay = GameDayPlayer.query.filter_by(gp_idGameDay=gameDayID).order_by(GameDayPlayer.gp_team.asc(), GameDayPlayer.gp_id.asc()).all()
     # Organize players by team
@@ -173,7 +174,7 @@ def managementGameDay_detail(gameDayID):
         if player.gp_team not in teams:
             teams[player.gp_team] = []
         teams[player.gp_team].append(player)
-    return render_template("managementGameDay_detail.html", user=current_user, gameDay=gameDay_data, result=results, classification=classifications, number_of_teamsGD=number_of_teamsGD, number_of_teams_league=number_of_teams_league, players_data=players_data, gameDayPlayers=gameDayPlayers, league_id=league_id, gameDay_id=gameDay_id, teams=teams) 
+    return render_template("managementGameDay_detail.html", user=current_user, gameDay=gameDay_data, result=results, classification=classifications, number_of_teamsGD=number_of_teamsGD, number_of_teams_league=number_of_teams_league, players_data=players_data, gameDayPlayers=gameDayPlayers, league_id=league_id, gameDay_id=gameDay_id, teams=teams, type_gameday=type_gameday) 
 
 @views.route('/print_page/<gameDayID>')
 @login_required
@@ -1242,6 +1243,35 @@ def submitResultsGameDay(gameDayID):
         if type_of_league == 5:
             #Create one more round
             createMexicanRound(gameDayID)
+
+    return redirect(url_for('views.managementGameDay_detail', gameDayID=gameDayID)) 
+
+@views.route('/endMexican/<gameDayID>', methods=['GET', 'POST'])
+@login_required
+def endMexican(gameDayID):
+    gameDay_data = GameDay.query.filter_by(gd_id=gameDayID).first()
+    league_id = gameDay_data.gd_idLeague
+
+    # Delete all the games of the league day that still have results as 0
+    db.session.execute(
+    text(f"delete from tb_game where gd_id=:gameDayID and gd_idLeague=:league_id and gm_result_A=0 and gm_result_B=0"),
+        {"gameDayID": gameDayID, "league_id": league_id}
+    )
+    db.session.commit()
+
+    #If all gamedays of that league are Terminado  change status of League to Terminado
+    ended_game_days_count = GameDay.query.filter_by(gd_idLeague=league_id, gd_status='Por Jogar').count()
+
+    if ended_game_days_count == 0:
+        # Update the league status to 'Terminado'
+        league = League.query.get(league_id)
+        if league.lg_id_tp !=6:
+            league.lg_status = '8 - Terminado'
+        db.session.commit()
+
+    calculateGameDayClassification(gameDayID)
+    calculateLeagueClassification(league_id)
+    calculate_ELO_parcial()
 
     return redirect(url_for('views.managementGameDay_detail', gameDayID=gameDayID)) 
 
