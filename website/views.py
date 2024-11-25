@@ -1252,12 +1252,14 @@ def endMexican(gameDayID):
     gameDay_data = GameDay.query.filter_by(gd_id=gameDayID).first()
     league_id = gameDay_data.gd_idLeague
 
+    print("Before Delete")
     # Delete all the games of the league day that still have results as 0
     db.session.execute(
-    text(f"delete from tb_game where gd_id=:gameDayID and gd_idLeague=:league_id and gm_result_A=0 and gm_result_B=0"),
+    text(f"delete from tb_game where gm_idGameDay=:gameDayID and gm_idLeague=:league_id and gm_result_A=0 and gm_result_B=0"),
         {"gameDayID": gameDayID, "league_id": league_id}
     )
     db.session.commit()
+    print("After Delete")
 
     #If all gamedays of that league are Terminado  change status of League to Terminado
     ended_game_days_count = GameDay.query.filter_by(gd_idLeague=league_id, gd_status='Por Jogar').count()
@@ -1269,9 +1271,11 @@ def endMexican(gameDayID):
             league.lg_status = '8 - Terminado'
         db.session.commit()
 
+    print("Before Calculations")
     calculateGameDayClassification(gameDayID)
     calculateLeagueClassification(league_id)
     calculate_ELO_parcial()
+    print("After Calculations")
 
     return redirect(url_for('views.managementGameDay_detail', gameDayID=gameDayID)) 
 
