@@ -1241,8 +1241,14 @@ def submitResultsGameDay(gameDayID):
 
         # If it is a mexican then we need to create one more round based on the gameday classification.
         if type_of_league == 5:
-            #Create one more round
-            createMexicanRound(gameDayID)
+            #Only create games if there isn´t any at 0-0
+            gamesAt0 = db.session.execute(
+            text(f"select count(*) as gamesAt0 from tb_game where gm_result_A=0 and gm_result_B=0 and gm_idGameDay=:gameDayID"),
+            {"gameDayID": gameDayID}
+            ).fetchone()
+            if gamesAt0 ==0:
+                #Create one more round
+                createMexicanRound(gameDayID)
 
     return redirect(url_for('views.managementGameDay_detail', gameDayID=gameDayID)) 
 
@@ -1816,7 +1822,7 @@ def calculateGameDayClassification(gameDayID):
             player_birthday = player.pl_birthday
             player_age = calculate_player_age(player_birthday)
 
-            games_info_query = Game.query.filter(Game.gm_idGameDay == gameDayID, ((Game.gm_idPlayer_A1 == id_player) | (Game.gm_idPlayer_A2 == id_player) | (Game.gm_idPlayer_B1 == id_player) | (Game.gm_idPlayer_B2 == id_player)), ((Game.gm_result_A > 0) | (Game.gm_result_B > 0)))
+            games_info_query = Game.query.filter(Game.gm_idGameDay == gameDayID, ((Game.gm_idPlayer_A1 == id_player) | (Game.gm_idPlayer_A2 == id_player) | (Game.gm_idPlayer_B1 == id_player) | (Game.gm_idPlayer_B2 == id_player)), ~((Game.gm_result_A == 0) & (Game.gm_result_B == 0)))
             games_info = games_info_query.first()
 
             if games_info:
@@ -1883,7 +1889,7 @@ def calculateGameDayClassification(gameDayID):
                             else_=None
                         ).label("LOSSES")
                     )
-                    .filter(Game.gm_idGameDay == gameDayID, (Game.gm_idPlayer_A1 == id_player) | (Game.gm_idPlayer_A2 == id_player) | (Game.gm_idPlayer_B1 == id_player) | (Game.gm_idPlayer_B2 == id_player))
+                    .filter(Game.gm_idGameDay == gameDayID, (Game.gm_idPlayer_A1 == id_player) | (Game.gm_idPlayer_A2 == id_player) | (Game.gm_idPlayer_B1 == id_player) | (Game.gm_idPlayer_B2 == id_player), ~((Game.gm_result_A == 0) & (Game.gm_result_B == 0)))
                     .subquery("TOTALS")
                 )
                 
