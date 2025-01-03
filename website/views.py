@@ -1241,8 +1241,14 @@ def submitResultsGameDay(gameDayID):
 
         # If it is a mexican then we need to create one more round based on the gameday classification.
         if type_of_league == 5:
-            #Create one more round
-            createMexicanRound(gameDayID)
+            #Only create games if there isn´t any at 0-0
+            gamesAt0 = db.session.execute(
+            text(f"select count(*) as gamesAt0 from tb_game where gm_result_A=0 and gm_result_B=0 and gm_idGameDay=:gameDayID"),
+            {"gameDayID": gameDayID}
+            ).fetchone()
+            if gamesAt0 ==0:
+                #Create one more round
+                createMexicanRound(gameDayID)
 
     return redirect(url_for('views.managementGameDay_detail', gameDayID=gameDayID)) 
 
@@ -1251,6 +1257,26 @@ def submitResultsGameDay(gameDayID):
 def endMexican(gameDayID):
     gameDay_data = GameDay.query.filter_by(gd_id=gameDayID).first()
     league_id = gameDay_data.gd_idLeague
+    leagueObject = League.query.filter_by(lg_id=league_id).first()
+    #Get all ids of that gameday
+    result = Game.query.filter_by(gm_idGameDay=gameDayID).all()
+    if result:
+        for data in result:
+            resultA = f"resultGameA{data.gm_id}"
+            resultB = f"resultGameB{data.gm_id}"
+            gameID = data.gm_id
+            getResultA = request.form.get(resultA)
+            getResultB = request.form.get(resultB)
+            #Process all the results that are not 0
+            if getResultA > 0 or getResultB > 0:
+                db.session.execute(
+                text(f"update tb_game set gm_result_A=:getResultA, gm_result_B=:getResultB where gm_id=:gameID and gm_idLeague=:league_id"),
+                    {"getResultA": getResultA, "getResultB": getResultB, "gameID": gameID, "league_id": league_id}
+                )
+                db.session.commit()
+
+    
+    
 
     print("Before Delete")
     # Delete all the games of the league day that still have results as 0
@@ -1816,7 +1842,7 @@ def calculateGameDayClassification(gameDayID):
             player_birthday = player.pl_birthday
             player_age = calculate_player_age(player_birthday)
 
-            games_info_query = Game.query.filter(Game.gm_idGameDay == gameDayID, ((Game.gm_idPlayer_A1 == id_player) | (Game.gm_idPlayer_A2 == id_player) | (Game.gm_idPlayer_B1 == id_player) | (Game.gm_idPlayer_B2 == id_player)), ((Game.gm_result_A > 0) | (Game.gm_result_B > 0)))
+            games_info_query = Game.query.filter(Game.gm_idGameDay == gameDayID, ((Game.gm_idPlayer_A1 == id_player) | (Game.gm_idPlayer_A2 == id_player) | (Game.gm_idPlayer_B1 == id_player) | (Game.gm_idPlayer_B2 == id_player)), ~((Game.gm_result_A == 0) & (Game.gm_result_B == 0)))
             games_info = games_info_query.first()
 
             if games_info:
@@ -1883,7 +1909,7 @@ def calculateGameDayClassification(gameDayID):
                             else_=None
                         ).label("LOSSES")
                     )
-                    .filter(Game.gm_idGameDay == gameDayID, (Game.gm_idPlayer_A1 == id_player) | (Game.gm_idPlayer_A2 == id_player) | (Game.gm_idPlayer_B1 == id_player) | (Game.gm_idPlayer_B2 == id_player))
+                    .filter(Game.gm_idGameDay == gameDayID, (Game.gm_idPlayer_A1 == id_player) | (Game.gm_idPlayer_A2 == id_player) | (Game.gm_idPlayer_B1 == id_player) | (Game.gm_idPlayer_B2 == id_player), ~((Game.gm_result_A == 0) & (Game.gm_result_B == 0)))
                     .subquery("TOTALS")
                 )
                 
