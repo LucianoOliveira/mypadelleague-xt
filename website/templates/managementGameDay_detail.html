@@ -253,17 +253,7 @@
   </div>
   </form>
 
-{% if type_gameday == 5 %}
-<!-- buttons -->
-<div class="container">
-  <div class="row">
-      <div class="col-md-12 text-left">
-          <a href="{{ url_for('views.endMexican', gameDayID=gameDay.gd_id) }}" class="btn btn-light btn-round px-5"> Terminar Mexicano</a>
-      </div>
-  </div>
-</div>
-</br>
-{% endif %}
+
 
 
   <!-- Second Row -->
@@ -311,6 +301,18 @@
     </div>
   </div><!--End Row-->
   
+
+  {% if type_gameday == 5 %}
+  <!-- buttons -->
+  <div class="container">
+    <div class="row">
+        <div class="col-md-12 text-left">
+            <a href="{{ url_for('views.endMexican', gameDayID=gameDay.gd_id) }}" class="btn btn-danger btn-round px-5"> Terminar Mexicano</a>
+        </div>
+    </div>
+  </div>
+  </br>
+  {% endif %}
 
   
 

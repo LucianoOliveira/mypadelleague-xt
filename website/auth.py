@@ -20,12 +20,17 @@ def login():
 
         user = Players.query.filter_by(pl_email=email).first()
         if user:
+            print("User found")
             if check_password_hash(user.pl_pwd, password):
                 # flash('Logged in successfully!', category='success')
+                print("Logged in successfully!")
                 login_user(user, remember=True)
                 return redirect(url_for('views.managementLeague'))
             else:
                 flash('Incorrect password, try again.', category='error')
+                print("Incorrect password, try again.")
+        else:
+            print("User Not found")
 
     return render_template("login.html", user=current_user)
 

@@ -1257,6 +1257,26 @@ def submitResultsGameDay(gameDayID):
 def endMexican(gameDayID):
     gameDay_data = GameDay.query.filter_by(gd_id=gameDayID).first()
     league_id = gameDay_data.gd_idLeague
+    leagueObject = League.query.filter_by(lg_id=league_id).first()
+    #Get all ids of that gameday
+    result = Game.query.filter_by(gm_idGameDay=gameDayID).all()
+    if result:
+        for data in result:
+            resultA = f"resultGameA{data.gm_id}"
+            resultB = f"resultGameB{data.gm_id}"
+            gameID = data.gm_id
+            getResultA = request.form.get(resultA)
+            getResultB = request.form.get(resultB)
+            #Process all the results that are not 0
+            if getResultA > 0 or getResultB > 0:
+                db.session.execute(
+                text(f"update tb_game set gm_result_A=:getResultA, gm_result_B=:getResultB where gm_id=:gameID and gm_idLeague=:league_id"),
+                    {"getResultA": getResultA, "getResultB": getResultB, "gameID": gameID, "league_id": league_id}
+                )
+                db.session.commit()
+
+    
+    
 
     print("Before Delete")
     # Delete all the games of the league day that still have results as 0
