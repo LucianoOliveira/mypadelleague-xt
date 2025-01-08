@@ -1220,6 +1220,7 @@ def submitResultsGameDay(gameDayID):
         text(f"update tb_gameday SET gd_status='Terminado' where gd_id=:gameDayID and gd_idLeague=:league_id"),
             {"gameDayID": gameDayID, "league_id": league_id}
         )
+        print("Ended GameDay")
         db.session.commit()
 
         #If all gamedays of that league are Terminado  change status of League to Terminado
@@ -1241,13 +1242,18 @@ def submitResultsGameDay(gameDayID):
 
         # If it is a mexican then we need to create one more round based on the gameday classification.
         if type_of_league == 5:
+            print("Entered mexican part")
             #Only create games if there isn´t any at 0-0
             gamesAt0 = db.session.execute(
             text(f"select count(*) as gamesAt0 from tb_game where gm_result_A=0 and gm_result_B=0 and gm_idGameDay=:gameDayID"),
             {"gameDayID": gameDayID}
             ).fetchone()
-            if gamesAt0 ==0:
+            print(f"gamesAt0= gamesAt0")
+            gamesAt0_value = gamesAt0[0]
+            print(f"gamesAt0_value= gamesAt0_value")
+            if gamesAt0_value  == 0:
                 #Create one more round
+                print("Needs to create one more round")
                 createMexicanRound(gameDayID)
 
     return redirect(url_for('views.managementGameDay_detail', gameDayID=gameDayID)) 
@@ -1277,7 +1283,7 @@ def endMexican(gameDayID):
 
     
     
-
+    print("End Mexican Started")
     print("Before Delete")
     # Delete all the games of the league day that still have results as 0
     db.session.execute(
