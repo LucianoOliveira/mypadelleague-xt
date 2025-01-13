@@ -1248,13 +1248,20 @@ def submitResultsGameDay(gameDayID):
             text(f"select count(*) as gamesAt0 from tb_game where gm_result_A=0 and gm_result_B=0 and gm_idGameDay=:gameDayID"),
             {"gameDayID": gameDayID}
             ).fetchone()
-            print(f"gamesAt0= gamesAt0")
+            print(f"gamesAt0= {gamesAt0}")
             gamesAt0_value = gamesAt0[0]
-            print(f"gamesAt0_value= gamesAt0_value")
-            if gamesAt0_value  == 0:
-                #Create one more round
-                print("Needs to create one more round")
-                createMexicanRound(gameDayID)
+            print(f"gamesAt0_value= {gamesAt0_value}")
+
+            #Delete all games that are 0
+            print("Before delete all zero games")
+            db.session.execute(
+            text(f"delete from tb_game where gm_result_A=0 and gm_result_B=0 and gm_idGameDay=:gameDayID"),
+                {"gameDayID": gameDayID}
+            )
+            db.session.commit()
+            #Create one more round
+            print("Needs to create one more round")
+            createMexicanRound(gameDayID)
 
     return redirect(url_for('views.managementGameDay_detail', gameDayID=gameDayID)) 
 
