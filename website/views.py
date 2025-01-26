@@ -1281,12 +1281,13 @@ def endMexican(gameDayID):
             getResultA = request.form.get(resultA)
             getResultB = request.form.get(resultB)
             #Process all the results that are not 0
-            if getResultA > 0 or getResultB > 0:
-                db.session.execute(
-                text(f"update tb_game set gm_result_A=:getResultA, gm_result_B=:getResultB where gm_id=:gameID and gm_idLeague=:league_id"),
-                    {"getResultA": getResultA, "getResultB": getResultB, "gameID": gameID, "league_id": league_id}
-                )
-                db.session.commit()
+            # if getResultA and getResultB:
+            #     if getResultA > 0 or getResultB > 0:
+            #         db.session.execute(
+            #         text(f"update tb_game set gm_result_A=:getResultA, gm_result_B=:getResultB where gm_id=:gameID and gm_idLeague=:league_id"),
+            #             {"getResultA": getResultA, "getResultB": getResultB, "gameID": gameID, "league_id": league_id}
+            #         )
+            #         db.session.commit()
 
     
     
