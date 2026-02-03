@@ -59,7 +59,8 @@ def sign_up():
             elif len(password1) < 7:
                 flash('Password must be greater than 6 characters.', category='error')
             else:
-                user.pl_pwd = generate_password_hash(password1, method='sha256')
+                #user.pl_pwd = generate_password_hash(password1, method='sha256')
+                user.pl_pwd = generate_password_hash(password1)
                 db.session.commit()
                 login_user(user, remember=True)
                 # flash('User created successfully!', category='success')
