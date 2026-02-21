@@ -906,6 +906,29 @@ def player_detail(playerID):
     else:
         player_name_short = name_parts[0]  # If there is no name enclosed in double quotes
     
+    # rankingELO_histByDate - Get last game ELO for each day
+    try:
+        rankingELO_histByDate = db.session.execute(
+            text(f"""SELECT 
+                        el_date, 
+                        el_afterRank,
+                        ROW_NUMBER() OVER (PARTITION BY el_date ORDER BY el_startTime DESC) as rn
+                     FROM tb_ELO_ranking_hist 
+                     WHERE el_pl_id=:playerID 
+                     ORDER BY el_date DESC, el_startTime DESC"""),
+            {"playerID": playerID},
+        ).fetchall()
+        
+        # Filter to get only the last game of each day (rn = 1)
+        rankingELO_histByDate = [row for row in rankingELO_histByDate if row[2] == 1][:50]
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        rankingELO_histByDate = []
+
+    if not rankingELO_histByDate:
+        rankingELO_histByDate = []
+
     # DONE - Get data from games to complete user data
     player_data = {
         "player_id": current_Player.pl_id,
@@ -930,7 +953,7 @@ def player_detail(playerID):
         "best_opponent_victory_percentage": "{:.2f}".format(best_opponent[4]),
         "best_opponent_games": best_opponent[3],
     }
-    return render_template("player_detail.html", user=current_user, player_id=playerID, player=player_data, results=games_query, getPlayerStats=player_stats, best_teammate=best_teammate, rankingELO_hist=rankingELO_hist, rankingELO_histShort=rankingELO_histShort, rankingELO_bestWorst=rankingELO_bestWorst)   
+    return render_template("player_detail.html", user=current_user, player_id=playerID, player=player_data, results=games_query, getPlayerStats=player_stats, best_teammate=best_teammate, rankingELO_hist=rankingELO_hist, rankingELO_histShort=rankingELO_histShort, rankingELO_bestWorst=rankingELO_bestWorst, rankingELO_histByDate=rankingELO_histByDate)   
 
 @views.route('/player_edit/<playerID>', methods=['GET', 'POST'])
 @login_required

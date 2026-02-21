@@ -2,6 +2,26 @@
 {% block content %}
 <!-- WPT -->
 <link href="../static/css/swiper-bundle.min.css" rel="stylesheet"/>
+
+<style>
+  /* Tab styling */
+  .btn-group .btn.active {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+  }
+  
+  .btn-group .btn:not(.active):hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+  }
+
+  .btn-outline-light.active {
+    color: #fff !important;
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+  }
+</style>
+
 <!-- Show front page of gameday -->
 <!-- Show every detail of a player -->
 
@@ -119,6 +139,11 @@
       <div class="card">
           <div class="card-header">Evolução Ranking ELO
               <div class="card-action">
+                  <!-- Tab navigation -->
+                  <div class="btn-group btn-group-sm" role="group">
+                      <button type="button" class="btn btn-outline-light active" id="tab-games" onclick="switchTab('games')">Por Jogos</button>
+                      <button type="button" class="btn btn-outline-light" id="tab-dates" onclick="switchTab('dates')">Por Datas</button>
+                  </div>
               </div>
           </div>
           <div class="card-body">
@@ -160,6 +185,11 @@
       <div class="card">
           <div class="card-header">Evolução Ranking ELO
               <div class="card-action">
+                  <!-- Tab navigation for mobile -->
+                  <div class="btn-group btn-group-sm" role="group">
+                      <button type="button" class="btn btn-outline-light active" id="tab-games-mobile" onclick="switchTabMobile('games')">Por Jogos</button>
+                      <button type="button" class="btn btn-outline-light" id="tab-dates-mobile" onclick="switchTabMobile('dates')">Por Datas</button>
+                  </div>
               </div>
           </div>
           <div class="card-body">
@@ -278,31 +308,47 @@
 <script src="../static/js/index.js"></script>
 
 <script>
-  const xValues = [];
-  const yValues = [];
-  xValues[0]= 0;
-  yValues[0]= 1000;
+  // Game ID based data (original)
+  const xValuesGames = [];
+  const yValuesGames = [];
+  xValuesGames[0]= 0;
+  yValuesGames[0]= 1000;
   {% for dataELO in rankingELO_hist %}
       {% set index = loop.length - loop.index0 - 1 %}
-      xValues[{{ index }}] = {{ dataELO[0] }};
-      yValues[{{ index }}] = {{ dataELO[9] }};
+      xValuesGames[{{ index }}] = {{ dataELO[0] }};
+      yValuesGames[{{ index }}] = {{ dataELO[9] }};
   {% endfor %}
 
-  const xValuesShort = [];
-  const yValuesShort = [];
+  const xValuesGamesShort = [];
+  const yValuesGamesShort = [];
   {% for dataELOShort in rankingELO_histShort %}
       {% set index = loop.length - loop.index0 - 1 %}
-      xValuesShort[{{ index }}] = {{ dataELOShort[0] }};
-      yValuesShort[{{ index }}] = {{ dataELOShort[9] }};
+      xValuesGamesShort[{{ index }}] = {{ dataELOShort[0] }};
+      yValuesGamesShort[{{ index }}] = {{ dataELOShort[9] }};
   {% endfor %}
 
-  new Chart("ELO_Chart", {
+  // Date based data (new)
+  const xValuesDates = [];
+  const yValuesDates = [];
+  {% if rankingELO_histByDate %}
+    {% for dataELODate in rankingELO_histByDate %}
+        {% set index = loop.length - loop.index0 - 1 %}
+        xValuesDates[{{ index }}] = "{{ dataELODate[0] }}";
+        yValuesDates[{{ index }}] = {{ dataELODate[1] }};
+    {% endfor %}
+  {% endif %}
+
+  const xValuesDatesShort = xValuesDates.slice(-10);
+  const yValuesDatesShort = yValuesDates.slice(-10);
+
+  // Chart configurations
+  const chartConfig = {
     type: "line",
     data: {
-      labels: xValues,
+      labels: xValuesGames,
       datasets: [{
         label: 'Ranking',
-        data: yValues,
+        data: yValuesGames,
         backgroundColor: 'rgba(255, 255, 255, 0.25)',
         borderColor: "transparent",
         pointRadius :"0",
@@ -344,15 +390,15 @@
         }]
        }
      }
-  });
+  };
 
-  new Chart("ELO_ChartShort", {
+  const chartConfigShort = {
     type: "line",
     data: {
-      labels: xValuesShort,
+      labels: xValuesGamesShort,
       datasets: [{
         label: 'Ranking',
-        data: yValuesShort,
+        data: yValuesGamesShort,
         backgroundColor: 'rgba(255, 255, 255, 0.25)',
         borderColor: "transparent",
         pointRadius :"0",
@@ -394,8 +440,63 @@
         }]
        }
      }
-  });
+  };
 
+  // Create charts
+  let chartMain = new Chart("ELO_Chart", chartConfig);
+  let chartMobile = new Chart("ELO_ChartShort", chartConfigShort);
+
+  // Tab switching function for desktop
+  function switchTab(tabType) {
+    const tabGames = document.getElementById('tab-games');
+    const tabDates = document.getElementById('tab-dates');
+    
+    if (tabType === 'games') {
+      tabGames.classList.add('active');
+      tabDates.classList.remove('active');
+      
+      // Update chart with game data
+      chartMain.data.labels = xValuesGames;
+      chartMain.data.datasets[0].data = yValuesGames;
+      chartMain.options.scales.xAxes[0].ticks.beginAtZero = true;
+      chartMain.update();
+    } else if (tabType === 'dates') {
+      tabGames.classList.remove('active');
+      tabDates.classList.add('active');
+      
+      // Update chart with date data
+      chartMain.data.labels = xValuesDates;
+      chartMain.data.datasets[0].data = yValuesDates;
+      chartMain.options.scales.xAxes[0].ticks.beginAtZero = false;
+      chartMain.update();
+    }
+  }
+
+  // Tab switching function for mobile
+  function switchTabMobile(tabType) {
+    const tabGamesMobile = document.getElementById('tab-games-mobile');
+    const tabDatesMobile = document.getElementById('tab-dates-mobile');
+    
+    if (tabType === 'games') {
+      tabGamesMobile.classList.add('active');
+      tabDatesMobile.classList.remove('active');
+      
+      // Update chart with game data
+      chartMobile.data.labels = xValuesGamesShort;
+      chartMobile.data.datasets[0].data = yValuesGamesShort;
+      chartMobile.options.scales.xAxes[0].ticks.beginAtZero = true;
+      chartMobile.update();
+    } else if (tabType === 'dates') {
+      tabGamesMobile.classList.remove('active');
+      tabDatesMobile.classList.add('active');
+      
+      // Update chart with date data
+      chartMobile.data.labels = xValuesDatesShort;
+      chartMobile.data.datasets[0].data = yValuesDatesShort;
+      chartMobile.options.scales.xAxes[0].ticks.beginAtZero = false;
+      chartMobile.update();
+    }
+  }
 </script>
 
 
